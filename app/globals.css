@@ -1,26 +1,138 @@
 @import "tailwindcss";
 
+/* 短链服务设计系统 */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  --color-primary: #4DB7FF;
+  --color-primary-hover: #66C5FF;
+  --color-primary-active: #1FA4FF;
+  --color-success: #4ADE80;
+  --color-warning: #FFB347;
+  --color-error: #FF6B6B;
+  --color-text-main: #1E293B;
+  --color-text-muted: #64748B;
+  --color-bg-surface: #F8FAFC;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --ease-spring: cubic-bezier(0.4, 0.0, 0.2, 1);
+  --duration-base: 0.3s;
+  --shine-angle: 120deg;
+  --shine-color: rgba(255, 255, 255, 0.4);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+
+  --shadow-sm: 0 2px 8px rgba(77, 183, 255, 0.15);
+  --shadow-md: 0 8px 24px rgba(77, 183, 255, 0.12);
+  --shadow-lg: 0 16px 32px rgba(77, 183, 255, 0.12);
+  --shadow-glow: 0 0 0 3px rgba(77, 183, 255, 0.25);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-bg-surface);
+  color: var(--color-text-main);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s var(--ease-spring) forwards;
+}
+
+/* 扫光效果 */
+.shine-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.shine-effect::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    var(--shine-angle), 
+    transparent 20%, 
+    var(--shine-color) 50%, 
+    transparent 80%
+  );
+  transform: translateX(-150%);
+  transition: transform 0.7s var(--ease-spring);
+  pointer-events: none; 
+}
+
+.shine-effect:hover::after {
+  transform: translateX(150%);
+}
+
+/* 按钮样式 */
+.cute-btn {
+  transition: transform 0.1s var(--ease-spring), background-color 0.2s;
+}
+.cute-btn:active {
+  transform: scale(0.96);
+}
+
+/* 输入框样式 */
+.cute-input-wrapper {
+  transition: box-shadow 0.3s var(--ease-spring), transform 0.2s;
+  border: 1px solid #E2E8F0;
+}
+.cute-input-wrapper:focus-within {
+  box-shadow: var(--shadow-glow);
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
+}
+
+/* 卡片样式 */
+.cute-card {
+  background: white;
+  border-radius: var(--radius-lg);
+  transition: transform 0.3s var(--ease-spring), box-shadow 0.3s var(--ease-spring);
+  border: 1px solid #F1F5F9;
+}
+.cute-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+
+/* 开关样式 */
+.cute-switch-checkbox:checked + div {
+  background-color: var(--color-primary);
+}
+.cute-switch-checkbox:checked + div > div {
+  transform: translateX(100%);
+}
+
+/* 选项卡样式 */
+.option-card {
+  transition: all 0.2s var(--ease-spring);
+  border: 1px solid transparent;
+}
+.option-card.active {
+  border-color: var(--color-primary);
+  background-color: #F0F9FF;
+}
+
+/* 背景网格 */
+.preview-grid {
+  background-image: radial-gradient(#E2E8F0 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+button:hover {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+a:hover{
+  cursor: pointer;
 }

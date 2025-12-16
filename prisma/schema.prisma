@@ -1,0 +1,58 @@
+// 短链服务数据库模型
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 短链模型
+model ShortLink {
+  id           Int      @id @default(autoincrement())
+  path         String   @unique // 短链路径，如 "abc123"
+  originalUrl  String   // 原始长链接
+  title        String?  // 页面标题（自动抓取）
+  
+  // 安全选项
+  password     String?  // 访问密码
+  expiresAt    DateTime? // 过期时间
+  requireConfirm Boolean @default(false) // 是否需要二次确认
+  enableIntermediate Boolean @default(true) // 是否启用过渡页
+  
+  // 统计信息
+  views        Int      @default(0) // 访问次数
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  // 访问日志
+  visitLogs    VisitLog[]
+}
+
+// 访问日志模型
+model VisitLog {
+  id        Int      @id @default(autoincrement())
+  shortId   Int
+  ip        String?
+  userAgent String?
+  referer   String?
+  createdAt DateTime @default(now())
+  
+  shortLink ShortLink @relation(fields: [shortId], references: [id], onDelete: Cascade)
+}
+
+// 系统设置模型
+model Setting {
+  key   String @id
+  value String
+}
+
+// 域名白名单/黑名单
+model DomainRule {
+  id     String @id @default(uuid())
+  domain String @unique
+  type   String // "whitelist" | "blacklist"
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+}

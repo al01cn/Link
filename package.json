@@ -6,21 +6,45 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "db:init": "tsx scripts/init-db.ts",
+    "db:reset": "prisma migrate reset --force",
+    "setup": "prisma generate && prisma db push && bun run db:init"
   },
   "dependencies": {
+    "@prisma/client": "5.22.0",
+    "dotenv": "^17.2.3",
+    "lucide-react": "^0.561.0",
+    "nanoid": "^5.1.6",
     "next": "16.0.10",
+    "prisma": "5.22.0",
     "react": "19.2.1",
     "react-dom": "19.2.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.1",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^5.1.2",
     "eslint": "^9",
     "eslint-config-next": "16.0.10",
+    "happy-dom": "^20.0.11",
+    "jsdom": "^27.3.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "tsx": "^4.21.0",
+    "typescript": "^5",
+    "vitest": "^4.0.16"
   }
 }

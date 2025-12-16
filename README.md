@@ -1,36 +1,209 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ShortLink - 短链服务
 
-## Getting Started
+简单、安全、强大的短链生成工具。基于 Next.js 14 + Prisma + SQLite 构建。
 
-First, run the development server:
+## ✨ 功能特性
 
+### 🔗 短链生成
+- 自动生成短链路径（Base62/NanoID）
+- 支持自定义短链路径
+- 自动抓取目标页面标题
+- 访问统计和日志记录
+
+### 🛡️ 安全功能
+- 密码保护短链
+- 二次确认跳转
+- 安全过渡页面
+- 白名单/黑名单域名管理
+- 防钓鱼提示
+
+### ⚡ 跳转模式
+- **直接跳转**：无中间页面，直接302重定向
+- **过渡页面**：显示目标信息，自动倒计时跳转
+- **手动确认**：需要用户手动点击确认
+- **快速跳转**：`/to?url=` 模式，临时安全跳转
+
+### 📊 管理功能
+- 短链列表管理
+- 访问统计查看
+- 批量操作支持
+- 过期时间设置
+
+## 🚀 快速开始
+
+### 环境要求
+- Node.js 18+
+- Bun (推荐) 或 npm/yarn
+
+### 安装步骤
+
+1. **克隆项目**
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone <repository-url>
+cd shortlink
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. **安装依赖**
+```bash
+bun install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. **环境配置**
+```bash
+cp .env.example .env.local
+# 编辑 .env.local 配置数据库和应用URL
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. **初始化数据库**
+```bash
+bun run setup
+```
 
-## Learn More
+5. **启动开发服务器**
+```bash
+bun run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+访问 [http://localhost:3000](http://localhost:3000) 开始使用。
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 📁 项目结构
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+├── app/                    # Next.js App Router
+│   ├── api/               # API 路由
+│   │   ├── links/         # 短链管理 API
+│   │   ├── visit/         # 访问统计 API
+│   │   └── to/            # 快速跳转 API
+│   ├── [path]/            # 短链访问页面
+│   ├── to/                # 快速跳转页面
+│   └── page.tsx           # 主页
+├── components/            # React 组件
+│   ├── Navbar.tsx         # 导航栏
+│   ├── HomeView.tsx       # 主页视图
+│   ├── SafeRedirectView.tsx # 安全跳转页面
+│   └── SettingsView.tsx   # 设置页面
+├── lib/                   # 工具库
+│   ├── db.ts              # 数据库连接
+│   └── utils.ts           # 工具函数
+├── prisma/                # 数据库配置
+│   └── schema.prisma      # 数据模型
+└── scripts/               # 脚本文件
+    └── init-db.ts         # 数据库初始化
+```
 
-## Deploy on Vercel
+## 🛠️ 可用脚本
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+# 开发
+bun run dev              # 启动开发服务器
+bun run build            # 构建生产版本
+bun run start            # 启动生产服务器
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# 数据库
+bun run db:generate      # 生成 Prisma 客户端
+bun run db:push          # 推送数据库模式
+bun run db:migrate       # 运行数据库迁移
+bun run db:studio        # 打开 Prisma Studio
+bun run db:init          # 初始化示例数据
+bun run db:reset         # 重置数据库
+
+# 一键设置
+bun run setup            # 生成客户端 + 推送模式 + 初始化数据
+```
+
+## 🔧 配置说明
+
+### 环境变量
+```bash
+# 数据库连接
+DATABASE_URL="file:./dev.db"
+
+# 应用基础URL
+NEXT_PUBLIC_BASE_URL="http://localhost:3000"
+```
+
+### 数据库迁移到 PostgreSQL
+```bash
+# 1. 更新 .env.local
+DATABASE_URL="postgresql://username:password@localhost:5432/shortlink"
+
+# 2. 更新 prisma/schema.prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+# 3. 重新生成和迁移
+bun run db:generate
+bun run db:migrate
+```
+
+## 📖 API 文档
+
+### 创建短链
+```bash
+POST /api/links
+Content-Type: application/json
+
+{
+  "originalUrl": "https://example.com",
+  "customPath": "custom", // 可选
+  "password": "secret",   // 可选
+  "requireConfirm": true, // 可选
+  "enableIntermediate": true // 可选
+}
+```
+
+### 获取短链列表
+```bash
+GET /api/links
+```
+
+### 访问短链
+```bash
+GET /{path}              # 直接访问短链
+POST /api/visit/{path}   # 验证密码并记录访问
+```
+
+### 快速跳转
+```bash
+GET /to?url=https://example.com
+```
+
+## 🎨 设计系统
+
+项目采用现代化的设计系统：
+- **颜色主题**：蓝色主色调 (#4DB7FF)
+- **字体**：Inter 字体家族
+- **动画**：Spring 缓动函数
+- **组件**：可爱风格的卡片和按钮
+- **图标**：Lucide React 图标库
+
+## 🚀 部署
+
+### Vercel 部署
+1. 推送代码到 GitHub
+2. 在 Vercel 导入项目
+3. 配置环境变量
+4. 部署完成
+
+### 自托管部署
+```bash
+# 构建项目
+bun run build
+
+# 启动生产服务器
+bun run start
+```
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+## 📄 许可证
+
+MIT License
+
+---
+
+**ShortLink** - 让长链接变短，让分享更简单 ✨
