@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { verifyPassword } from '@/lib/crypto'
 
 // 访问短链 - 获取链接信息
 export async function GET(
   request: NextRequest,
-  { params }: { params: { path: string } }
+  { params }: { params: Promise<{ path: string }> }
 ) {
   try {
-    const { path } = params
+    const { path } = await params
     
     // 查找短链
     const shortLink = await prisma.shortLink.findUnique({
@@ -42,10 +43,10 @@ export async function GET(
 // 验证密码并记录访问
 export async function POST(
   request: NextRequest,
-  { params }: { params: { path: string } }
+  { params }: { params: Promise<{ path: string }> }
 ) {
   try {
-    const { path } = params
+    const { path } = await params
     const body = await request.json()
     const { password } = body
 
@@ -64,7 +65,7 @@ export async function POST(
     }
 
     // 验证密码
-    if (shortLink.password && shortLink.password !== password) {
+    if (shortLink.password && !verifyPassword(password || '', shortLink.password)) {
       return NextResponse.json({ error: '密码错误' }, { status: 401 })
     }
 

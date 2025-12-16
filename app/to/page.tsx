@@ -14,6 +14,12 @@ export default function ToPage() {
   const [countdown, setCountdown] = useState(5)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+  const [isClient, setIsClient] = useState(false)
+
+  // 客户端水合完成后启用动画
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   useEffect(() => {
     const url = searchParams.get('url')
@@ -108,7 +114,7 @@ export default function ToPage() {
   return (
     <div className="min-h-screen bg-[--color-bg-surface] preview-grid">
       <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="cute-card max-w-md w-full p-8 text-center animate-fade-in">
+        <div className={`cute-card max-w-md w-full p-8 text-center ${isClient ? 'animate-fade-in' : ''}`}>
           <div className="w-16 h-16 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-6 relative">
             <AlertTriangle size={32} />
             {countdown > 0 && (
@@ -139,14 +145,14 @@ export default function ToPage() {
 
           {/* 倒计时消息 */}
           {countdown > 0 && (
-            <div className="mb-4 text-sm text-slate-400 font-medium animate-fade-in">
+            <div className={`mb-4 text-sm text-slate-400 font-medium ${isClient ? 'animate-fade-in' : ''}`}>
               <Clock size={14} className="inline mr-1 relative -top-px" />
               将在 {countdown} 秒后自动跳转...
             </div>
           )}
 
           {/* 操作按钮 */}
-          <div className="flex gap-3 animate-fade-in">
+          <div className={`flex gap-3 ${isClient ? 'animate-fade-in' : ''}`}>
             <button 
               onClick={handleCancel}
               className="flex-1 px-4 py-3 rounded-xl font-medium text-slate-600 hover:bg-slate-100 transition-colors text-sm"

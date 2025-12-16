@@ -62,10 +62,8 @@ export default function Home() {
 
       if (response.ok) {
         const data = await response.json()
-        // 跳转到目标URL
-        window.open(data.originalUrl, '_blank')
-        setCurrentView('home')
-        setRedirectTarget(null)
+        // 在当前标签页跳转到目标URL
+        window.location.href = data.originalUrl
       } else {
         const error = await response.json()
         alert(error.error || t('accessFailed'))

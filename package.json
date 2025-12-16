@@ -21,6 +21,8 @@
   },
   "dependencies": {
     "@prisma/client": "5.22.0",
+    "@types/crypto-js": "^4.2.2",
+    "crypto-js": "^4.2.0",
     "dotenv": "^17.2.3",
     "lucide-react": "^0.561.0",
     "nanoid": "^5.1.6",

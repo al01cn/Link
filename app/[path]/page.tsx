@@ -3,11 +3,11 @@ import { prisma } from '@/lib/db'
 import SafeRedirectClient from './SafeRedirectClient'
 
 interface PageProps {
-  params: { path: string }
+  params: Promise<{ path: string }>
 }
 
 export default async function ShortLinkPage({ params }: PageProps) {
-  const { path } = params
+  const { path } = await params
 
   try {
     // 查找短链
@@ -31,7 +31,7 @@ export default async function ShortLinkPage({ params }: PageProps) {
       )
     }
 
-    // 如果不需要任何中间页面，直接跳转
+    // 直接跳转的条件：没有密码、不需要确认、且禁用了中间页
     if (!shortLink.password && !shortLink.requireConfirm && !shortLink.enableIntermediate) {
       // 记录访问（在服务端）
       await Promise.all([

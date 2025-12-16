@@ -29,6 +29,12 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
   const [domainRules, setDomainRules] = useState<DomainRule[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isAddingDomain, setIsAddingDomain] = useState(false)
+  const [isClient, setIsClient] = useState(false)
+
+  // 客户端水合完成后启用动画
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   // 加载设置和域名规则
   useEffect(() => {
@@ -164,11 +170,11 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
   const currentDomains = (domainRules || []).filter(rule => rule.type === settings.mode)
 
   return (
-    <div className="max-w-2xl mx-auto mt-10 animate-fade-in pb-20">
+    <div className={`max-w-2xl mx-auto mt-10 pb-20 ${isClient ? 'animate__animated animate__fadeInUp' : ''}`}>
       <div className="cute-card p-8">
         <div className="flex justify-between items-center mb-8">
           <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Settings className="text-[--color-primary]" />
+            <Settings className="text-[var(--color-primary)]" />
             {t('systemSettings')}
           </h2>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-400">
@@ -179,7 +185,7 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
         <div className="space-y-10">
           
           {/* 安全模式选择 */}
-          <div className="animate-fade-in">
+          <div className={isClient ? 'animate__animated animate__fadeIn' : ''}>
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
               <Shield size={16} />
               {t('securityMode')}
@@ -187,7 +193,7 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
             <div className="grid md:grid-cols-2 gap-4">
               <div 
                 className={`option-card p-4 rounded-xl cursor-pointer bg-slate-50 relative ${
-                  settings.mode === 'whitelist' ? 'active ring-2 ring-[--color-primary]' : 'hover:bg-slate-100'
+                  settings.mode === 'whitelist' ? 'active ring-2 ring-[var(--color-primary)]' : 'hover:bg-slate-100'
                 }`}
                 onClick={() => {
                   const newSettings = {...settings, mode: 'whitelist' as 'whitelist' | 'blacklist'}
@@ -196,7 +202,7 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
               >
                 <div className="flex items-center gap-3 mb-2">
                   <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                    settings.mode === 'whitelist' ? 'border-[--color-primary] bg-[--color-primary]' : 'border-slate-300'
+                    settings.mode === 'whitelist' ? 'border-[var(--color-primary)] bg-[var(--color-primary)]' : 'border-slate-300'
                   }`}>
                     {settings.mode === 'whitelist' && <Check size={12} className="text-white" />}
                   </div>
@@ -207,7 +213,7 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
 
               <div 
                 className={`option-card p-4 rounded-xl cursor-pointer bg-slate-50 relative ${
-                  settings.mode === 'blacklist' ? 'active ring-2 ring-[--color-primary]' : 'hover:bg-slate-100'
+                  settings.mode === 'blacklist' ? 'active ring-2 ring-[var(--color-primary)]' : 'hover:bg-slate-100'
                 }`}
                 onClick={() => {
                   const newSettings = {...settings, mode: 'blacklist' as 'whitelist' | 'blacklist'}
@@ -216,7 +222,7 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
               >
                 <div className="flex items-center gap-3 mb-2">
                   <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                    settings.mode === 'blacklist' ? 'border-[--color-primary] bg-[--color-primary]' : 'border-slate-300'
+                    settings.mode === 'blacklist' ? 'border-[var(--color-primary)] bg-[var(--color-primary)]' : 'border-slate-300'
                   }`}>
                     {settings.mode === 'blacklist' && <Check size={12} className="text-white" />}
                   </div>
@@ -228,7 +234,7 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
           </div>
 
           {/* 跳转等待时间 */}
-          <div className="animate-fade-in">
+          <div className={isClient ? 'animate__animated animate__fadeIn' : ''}>
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
               <Clock size={16} />
               {t('redirectWait')}
@@ -253,7 +259,7 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
           </div>
 
           {/* 域名列表 */}
-          <div className="animate-fade-in">
+          <div className={isClient ? 'animate__animated animate__fadeIn' : ''}>
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">
               {settings.mode === 'whitelist' ? t('whitelistDomains') : t('blacklistDomains')}
             </h3>
@@ -278,7 +284,7 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
                   className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
                     isAddingDomain || !newDomain.trim() 
                       ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
-                      : 'bg-[--color-primary] text-white hover:bg-[--color-primary-hover]'
+                      : 'bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]'
                   }`}
                 >
                   {isAddingDomain ? (
@@ -310,7 +316,7 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
                       }`}
                     >
                       <span className={`w-2 h-2 rounded-full ${
-                        settings.mode === 'whitelist' ? 'bg-[--color-success]' : 'bg-[--color-error]'
+                        settings.mode === 'whitelist' ? 'bg-[var(--color-success)]' : 'bg-[var(--color-error)]'
                       }`}></span>
                       {rule.domain}
                       <button
@@ -341,13 +347,13 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer">
                 <span className="text-slate-700">{t('cleanup30')}</span>
-                <div className="w-10 h-6 bg-[--color-primary] rounded-full relative cursor-pointer">
+                <div className="w-10 h-6 bg-[var(--color-primary)] rounded-full relative cursor-pointer">
                   <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
                 </div>
               </div>
               <div className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer">
                 <span className="text-slate-700">{t('cleanupExpired')}</span>
-                <div className="w-10 h-6 bg-[--color-primary] rounded-full relative cursor-pointer">
+                <div className="w-10 h-6 bg-[var(--color-primary)] rounded-full relative cursor-pointer">
                   <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
                 </div>
               </div>

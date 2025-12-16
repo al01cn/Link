@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { generateShortPath, isValidUrl, fetchPageTitle, extractDomain, checkDomainAccessServer } from '@/lib/utils'
+import { encryptPassword } from '@/lib/crypto'
 
 // 创建短链
 export async function POST(request: NextRequest) {
@@ -62,13 +63,16 @@ export async function POST(request: NextRequest) {
     // 尝试获取页面标题
     const title = await fetchPageTitle(originalUrl)
 
+    // 加密密码（如果有的话）
+    const encryptedPassword = password ? encryptPassword(password) : null
+
     // 创建短链记录
     const shortLink = await prisma.shortLink.create({
       data: {
         path,
         originalUrl,
         title,
-        password,
+        password: encryptedPassword,
         expiresAt: expiresAt ? new Date(expiresAt) : null,
         requireConfirm,
         enableIntermediate
@@ -81,7 +85,11 @@ export async function POST(request: NextRequest) {
       shortUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/${shortLink.path}`,
       originalUrl: shortLink.originalUrl,
       title: shortLink.title,
-      createdAt: shortLink.createdAt
+      views: shortLink.views,
+      createdAt: shortLink.createdAt,
+      hasPassword: !!shortLink.password,
+      requireConfirm: shortLink.requireConfirm,
+      enableIntermediate: shortLink.enableIntermediate
     })
 
   } catch (error) {

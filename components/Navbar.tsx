@@ -19,7 +19,7 @@ export default function Navbar({ onViewChange, currentView, lang, toggleLang, t 
         className="flex items-center gap-2 cursor-pointer" 
         onClick={() => onViewChange('home')}
       >
-        <div className="w-8 h-8 bg-[--color-primary] rounded-lg flex items-center justify-center text-white font-bold shine-effect shadow-lg">
+        <div className="w-8 h-8 bg-[var(--color-primary)] rounded-lg flex items-center justify-center text-white font-bold shine-effect shadow-lg">
           <Link2 size={20} />
         </div>
         <span className="font-bold text-xl tracking-tight text-slate-800">{t('appTitle')}</span>

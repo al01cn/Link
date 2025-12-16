@@ -1,14 +1,22 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Link2, Home } from 'lucide-react'
 import { useTranslation } from '@/lib/translations'
 
 export default function NotFound() {
+  const [isClient, setIsClient] = useState(false)
   const t = useTranslation('zh') // 默认中文，实际项目中可以从context获取
+  
+  // 客户端水合完成后启用动画
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
   return (
     <div className="min-h-screen bg-[--color-bg-surface] preview-grid flex items-center justify-center p-4">
-      <div className="cute-card max-w-md w-full p-8 text-center animate-fade-in">
+      <div className={`cute-card max-w-md w-full p-8 text-center ${isClient ? 'animate-fade-in' : ''}`}>
         <div className="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-6">
           <Link2 size={32} />
         </div>
