@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "dialog-polyfill/dist/dialog-polyfill.css";
 
 /* 短链服务设计系统 - 与原型完全一致 */
 :root {

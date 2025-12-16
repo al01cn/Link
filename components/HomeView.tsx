@@ -1,9 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link2, ArrowRight, Settings, ChevronDown, Lock, Shield, Zap, Eye, Copy, Trash2, X } from 'lucide-react'
 import { formatTimeAgo } from '@/lib/utils'
 import { TranslationKey } from '@/lib/translations'
+import { useConfirmDialog, useNotificationDialog } from '@/lib/useDialog'
+import ConfirmDialog from './ConfirmDialog'
+import NotificationDialog from './NotificationDialog'
+// 动态导入dialog-polyfill避免SSR问题
 
 interface ShortLink {
   id: number
@@ -31,6 +35,10 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
   const [copySuccess, setCopySuccess] = useState<string | null>(null)
   const [isClient, setIsClient] = useState(false)
   
+  // 对话框 hooks
+  const confirmDialog = useConfirmDialog()
+  const notificationDialog = useNotificationDialog()
+  
   // 密码弹窗状态
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [currentPassword, setCurrentPassword] = useState('')
@@ -38,9 +46,53 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
   
   // 管理员验证弹窗状态
   const [showAdminModal, setShowAdminModal] = useState(false)
-  const [adminKey, setAdminKey] = useState('')
   const [currentLinkId, setCurrentLinkId] = useState<number | null>(null)
   const [adminError, setAdminError] = useState('')
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false)
+  const adminDialogRef = useRef<HTMLDialogElement>(null)
+  const passwordDialogRef = useRef<HTMLDialogElement>(null)
+  
+  // 检查管理员登录状态
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const token = sessionStorage.getItem('adminToken')
+      setIsAdminLoggedIn(!!token)
+    }
+  }, [showAdminModal])
+
+  // 管理员弹窗效果
+  useEffect(() => {
+    const initAdminDialog = async () => {
+      const dialog = adminDialogRef.current
+      if (showAdminModal && dialog) {
+        if (!dialog.showModal) {
+          const dialogPolyfill = await import('dialog-polyfill')
+          dialogPolyfill.default.registerDialog(dialog)
+        }
+        dialog.showModal()
+      } else if (!showAdminModal && dialog && dialog.open) {
+        dialog.close()
+      }
+    }
+    initAdminDialog()
+  }, [showAdminModal])
+
+  // 密码弹窗效果
+  useEffect(() => {
+    const initPasswordDialog = async () => {
+      const dialog = passwordDialogRef.current
+      if (showPasswordModal && dialog) {
+        if (!dialog.showModal) {
+          const dialogPolyfill = await import('dialog-polyfill')
+          dialogPolyfill.default.registerDialog(dialog)
+        }
+        dialog.showModal()
+      } else if (!showPasswordModal && dialog && dialog.open) {
+        dialog.close()
+      }
+    }
+    initPasswordDialog()
+  }, [showPasswordModal])
   
   // 高级选项状态
   const [customPath, setCustomPath] = useState('')
@@ -131,11 +183,17 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
         setShowAdvanced(false)
       } else {
         const error = await response.json()
-        alert(error.error || t('generateFailed'))
+        notificationDialog.notify({
+          type: 'error',
+          message: error.error || t('generateFailed')
+        })
       }
     } catch (error) {
       console.error('生成短链失败:', error)
-      alert(t('generateFailed'))
+      notificationDialog.notify({
+        type: 'error',
+        message: t('generateFailed')
+      })
     } finally {
       setIsGenerating(false)
     }
@@ -152,7 +210,15 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
   }
 
   const deleteLink = async (id: number) => {
-    if (!confirm(t('confirmDelete'))) return
+    const confirmed = await confirmDialog.confirm({
+      type: 'danger',
+      title: '确认删除',
+      message: t('confirmDelete'),
+      confirmText: '删除',
+      cancelText: '取消'
+    })
+    
+    if (!confirmed) return
     
     try {
       const response = await fetch(`/api/links/${id}`, {
@@ -162,24 +228,30 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
       if (response.ok) {
         setLinks(links.filter(link => link.id !== id))
       } else {
-        alert(t('deleteFailed'))
+        notificationDialog.notify({
+          type: 'error',
+          message: t('deleteFailed')
+        })
       }
     } catch (error) {
       console.error('删除失败:', error)
-      alert(t('deleteFailed'))
+      notificationDialog.notify({
+        type: 'error',
+        message: t('deleteFailed')
+      })
     }
   }
 
   const showPassword = (id: number) => {
     setCurrentLinkId(id)
-    setAdminKey('')
     setAdminError('')
     setShowAdminModal(true)
   }
 
   const verifyAdminAndShowPassword = async () => {
-    if (!adminKey.trim()) {
-      setAdminError('请输入管理员密钥')
+    const token = typeof window !== 'undefined' ? sessionStorage.getItem('adminToken') : null
+    if (!token) {
+      setAdminError('请先登录管理员账户')
       return
     }
 
@@ -191,7 +263,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
     try {
       const response = await fetch(`/api/links/${currentLinkId}`, {
         headers: {
-          'x-admin-key': adminKey
+          'Authorization': `Bearer ${token}`
         }
       })
       
@@ -209,8 +281,11 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
         setShowPasswordModal(true)
       } else {
         const errorData = await response.json()
-        if (response.status === 403) {
-          setAdminError('管理员密钥错误，无权限查看密码')
+        if (response.status === 401) {
+          setAdminError('管理员权限已过期，请重新登录')
+          if (typeof window !== 'undefined') {
+            sessionStorage.removeItem('adminToken')
+          }
         } else {
           setAdminError(errorData.error || '获取密码失败')
         }
@@ -225,7 +300,6 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
 
   const closeAdminModal = () => {
     setShowAdminModal(false)
-    setAdminKey('')
     setAdminError('')
     setCurrentLinkId(null)
   }
@@ -296,7 +370,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1 ml-1">{t('customAddress')}</label>
                 <div className="cute-input-wrapper bg-white rounded-lg px-3 py-2 flex items-center gap-2 text-sm">
-                  <span className="text-slate-400">sh.rt/</span>
+                  <span className="text-slate-400">{process.env.NEXT_PUBLIC_BASE_URL?.replace(/^https?:\/\//, '') || 'localhost:3000'}/</span>
                   <input 
                     type="text" 
                     placeholder={t('customAddressPlaceholder')}
@@ -477,7 +551,11 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
 
       {/* 管理员验证弹窗 */}
       {showAdminModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <dialog 
+          ref={adminDialogRef}
+          className="backdrop:bg-black/50 bg-transparent p-4 rounded-2xl"
+          onClick={(e) => e.target === adminDialogRef.current && closeAdminModal()}
+        >
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate__animated animate__fadeIn animate__faster">
             {/* 弹窗标题 */}
             <div className="flex items-center justify-between mb-4">
@@ -495,27 +573,23 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
 
             {/* 说明文字 */}
             <p className="text-sm text-slate-600 mb-4">
-              查看密码需要管理员权限，请输入管理员密钥：
+              查看密码需要管理员权限，请确认您已登录管理员账户：
             </p>
 
-            {/* 密钥输入区域 */}
+            {/* 登录状态检查 */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-slate-600 mb-2">
-                管理员密钥
-              </label>
-              <div className={`cute-input-wrapper bg-slate-50 rounded-lg px-4 py-3 flex items-center gap-3 ${
-                adminError ? 'border-red-300 ring-1 ring-red-300' : ''
+              <div className={`bg-slate-50 rounded-lg p-4 flex items-center gap-3 ${
+                adminError ? 'border border-red-300' : 'border border-slate-200'
               }`}>
-                <Shield size={16} className="text-slate-400" />
-                <input 
-                  type="password" 
-                  value={adminKey}
-                  onChange={(e) => { setAdminKey(e.target.value); setAdminError(''); }}
-                  onKeyDown={(e) => e.key === 'Enter' && !loadingPassword && verifyAdminAndShowPassword()}
-                  className="flex-1 bg-transparent border-none outline-none text-slate-800"
-                  placeholder="请输入管理员密钥"
-                  disabled={loadingPassword}
-                />
+                <Shield size={20} className={isAdminLoggedIn ? 'text-green-500' : 'text-slate-400'} />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-slate-700">
+                    {isAdminLoggedIn ? '管理员已登录' : '需要管理员登录'}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {isAdminLoggedIn ? '点击下方按钮查看密码' : '请先在设置页面登录管理员账户'}
+                  </p>
+                </div>
               </div>
               {adminError && (
                 <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
@@ -536,31 +610,35 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
               </button>
               <button 
                 onClick={verifyAdminAndShowPassword}
-                disabled={loadingPassword || !adminKey.trim()}
+                disabled={loadingPassword || !isAdminLoggedIn}
                 className={`flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
-                  loadingPassword || !adminKey.trim() ? 'opacity-50 cursor-not-allowed' : ''
+                  loadingPassword || !isAdminLoggedIn ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
                 {loadingPassword ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    验证中...
+                    获取中...
                   </>
                 ) : (
                   <>
                     <Shield size={16} />
-                    验证并查看
+                    查看密码
                   </>
                 )}
               </button>
             </div>
           </div>
-        </div>
+        </dialog>
       )}
 
       {/* 密码显示弹窗 */}
       {showPasswordModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <dialog 
+          ref={passwordDialogRef}
+          className="backdrop:bg-black/50 bg-transparent p-4 rounded-2xl"
+          onClick={(e) => e.target === passwordDialogRef.current && setShowPasswordModal(false)}
+        >
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate__animated animate__fadeIn animate__faster">
             {/* 弹窗标题 */}
             <div className="flex items-center justify-between mb-4">
@@ -617,8 +695,30 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
               </button>
             </div>
           </div>
-        </div>
+        </dialog>
       )}
+
+      {/* 确认对话框 */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={confirmDialog.onClose}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.options.title}
+        message={confirmDialog.options.message}
+        confirmText={confirmDialog.options.confirmText}
+        cancelText={confirmDialog.options.cancelText}
+        type={confirmDialog.options.type}
+      />
+
+      {/* 通知对话框 */}
+      <NotificationDialog
+        isOpen={notificationDialog.isOpen}
+        onClose={notificationDialog.onClose}
+        title={notificationDialog.options.title}
+        message={notificationDialog.options.message}
+        type={notificationDialog.options.type}
+        confirmText={notificationDialog.options.confirmText}
+      />
     </div>
   )
 }

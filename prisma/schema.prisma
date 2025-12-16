@@ -56,3 +56,13 @@ model DomainRule {
   active Boolean @default(true)
   createdAt DateTime @default(now())
 }
+
+// 管理员账户模型
+model Admin {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String   // 加密后的密码
+  isDefault Boolean  @default(false) // 是否为默认账户
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

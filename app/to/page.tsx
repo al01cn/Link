@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { AlertTriangle, ExternalLink, Clock, ArrowRight } from 'lucide-react'
 import { isValidUrl } from '@/lib/utils'
 import { useTranslation } from '@/lib/translations'
 
-export default function ToPage() {
+function ToPageContent() {
   const t = useTranslation('zh') // 默认中文，实际项目中可以从context获取
   const searchParams = useSearchParams()
   const [targetUrl, setTargetUrl] = useState('')
@@ -169,5 +169,20 @@ export default function ToPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function ToPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[--color-bg-surface] preview-grid flex items-center justify-center">
+        <div className="cute-card max-w-md w-full p-8 text-center">
+          <div className="w-8 h-8 border-2 border-[--color-primary]/30 border-t-[--color-primary] rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-500">正在加载...</p>
+        </div>
+      </div>
+    }>
+      <ToPageContent />
+    </Suspense>
   )
 }

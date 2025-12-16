@@ -1,7 +1,7 @@
 'use client'
 
 import { Link2, Settings, Globe } from 'lucide-react'
-
+import AdminDropdown from './AdminDropdown'
 import { TranslationKey } from '@/lib/translations'
 
 interface NavbarProps {
@@ -47,6 +47,8 @@ export default function Navbar({ onViewChange, currentView, lang, toggleLang, t 
           <Settings size={18} />
           {t('settings')}
         </button>
+        
+        <AdminDropdown />
       </div>
     </nav>
   )

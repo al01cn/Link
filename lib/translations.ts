@@ -84,7 +84,21 @@ export const translations = {
     // 快速跳转
     loadingInfo: '正在获取链接信息...',
     accessError: '访问错误',
-    back: '返回'
+    back: '返回',
+    
+    // 管理员登录
+    management: '管理',
+    pleaseLoginToContinue: '请登录管理员账户以继续',
+    username: '用户名',
+    loginPassword: '密码',
+    enterUsername: '请输入用户名',
+    enterLoginPassword: '请输入密码',
+    login: '登录',
+    loggingIn: '登录中...',
+    loginFailed: '登录失败',
+    pleaseEnterUsernamePassword: '请输入用户名和密码',
+    defaultAccount: '默认账户',
+    defaultAccountWarning: '检测到您使用的是默认账户，建议在管理员设置中修改账号密码以确保安全。'
   },
   
   en: {
@@ -171,7 +185,21 @@ export const translations = {
     // 快速跳转
     loadingInfo: 'Loading link information...',
     accessError: 'Access Error',
-    back: 'Back'
+    back: 'Back',
+    
+    // 管理员登录
+    management: 'Management',
+    pleaseLoginToContinue: 'Please login with admin credentials to continue',
+    username: 'Username',
+    loginPassword: 'Password',
+    enterUsername: 'Enter username',
+    enterLoginPassword: 'Enter password',
+    login: 'Login',
+    loggingIn: 'Logging in...',
+    loginFailed: 'Login failed',
+    pleaseEnterUsernamePassword: 'Please enter username and password',
+    defaultAccount: 'Default Account',
+    defaultAccountWarning: 'Default account detected. It is recommended to change the account and password in admin settings for security.'
   }
 }
 

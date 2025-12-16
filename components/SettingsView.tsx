@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react'
 import { Settings, Shield, Clock, X, Check, Plus, Trash2 } from 'lucide-react'
 import { TranslationKey } from '@/lib/translations'
+import { useConfirmDialog, useNotificationDialog } from '@/lib/useDialog'
+import ConfirmDialog from './ConfirmDialog'
+import NotificationDialog from './NotificationDialog'
 
 interface SettingsData {
   mode: 'whitelist' | 'blacklist'
@@ -30,6 +33,10 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
   const [isLoading, setIsLoading] = useState(true)
   const [isAddingDomain, setIsAddingDomain] = useState(false)
   const [isClient, setIsClient] = useState(false)
+  
+  // 对话框 hooks
+  const confirmDialog = useConfirmDialog()
+  const notificationDialog = useNotificationDialog()
 
   // 客户端水合完成后启用动画
   useEffect(() => {
@@ -104,11 +111,17 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
         setNewDomain('')
       } else {
         const error = await response.json()
-        alert(error.error || '添加失败')
+        notificationDialog.notify({
+          type: 'error',
+          message: error.error || '添加失败'
+        })
       }
     } catch (error) {
       console.error('添加域名失败:', error)
-      alert('添加失败')
+      notificationDialog.notify({
+        type: 'error',
+        message: '添加失败'
+      })
     } finally {
       setIsAddingDomain(false)
     }
@@ -116,10 +129,15 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
 
   // 删除域名规则
   const deleteDomain = async (id: string) => {
-    // 添加确认对话框
-    if (!confirm('确定要删除这个域名规则吗？')) {
-      return
-    }
+    const confirmed = await confirmDialog.confirm({
+      type: 'danger',
+      title: '确认删除',
+      message: '确定要删除这个域名规则吗？',
+      confirmText: '删除',
+      cancelText: '取消'
+    })
+    
+    if (!confirmed) return
 
     try {
       const response = await fetch(`/api/domains/${id}`, {
@@ -157,12 +175,18 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
             errorMessage = `删除失败 (${response.status}): ${errorData.error || '未知错误'}`
         }
         
-        alert(errorMessage)
+        notificationDialog.notify({
+          type: 'error',
+          message: errorMessage
+        })
         console.error('删除域名失败:', errorData)
       }
     } catch (error) {
       console.error('删除域名网络错误:', error)
-      alert('网络错误，请检查连接后重试')
+      notificationDialog.notify({
+        type: 'error',
+        message: '网络错误，请检查连接后重试'
+      })
     }
   }
 
@@ -361,6 +385,28 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
           </div>
         </div>
       </div>
+
+      {/* 确认对话框 */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={confirmDialog.onClose}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.options.title}
+        message={confirmDialog.options.message}
+        confirmText={confirmDialog.options.confirmText}
+        cancelText={confirmDialog.options.cancelText}
+        type={confirmDialog.options.type}
+      />
+
+      {/* 通知对话框 */}
+      <NotificationDialog
+        isOpen={notificationDialog.isOpen}
+        onClose={notificationDialog.onClose}
+        title={notificationDialog.options.title}
+        message={notificationDialog.options.message}
+        type={notificationDialog.options.type}
+        confirmText={notificationDialog.options.confirmText}
+      />
     </div>
   )
 }

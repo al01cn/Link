@@ -5,7 +5,11 @@ import Navbar from '@/components/Navbar'
 import HomeView from '@/components/HomeView'
 import SafeRedirectView from '@/components/SafeRedirectView'
 import SettingsView from '@/components/SettingsView'
+import AdminLoginPage from '@/components/AdminLoginPage'
+import { AdminProvider, useAdmin } from '@/lib/AdminContext'
 import { useTranslation, type Language } from '@/lib/translations'
+import { useNotificationDialog } from '@/lib/useDialog'
+import NotificationDialog from '@/components/NotificationDialog'
 
 interface ShortLink {
   id: number
@@ -20,7 +24,8 @@ interface ShortLink {
   enableIntermediate: boolean
 }
 
-export default function Home() {
+function HomeContent() {
+  const { isAuthenticated } = useAdmin()
   const [currentView, setCurrentView] = useState('home')
   const [redirectTarget, setRedirectTarget] = useState<ShortLink | null>(null)
   const [lang, setLang] = useState<Language>('zh')
@@ -30,6 +35,14 @@ export default function Home() {
   })
 
   const t = useTranslation(lang)
+  
+  // 通知对话框 hook
+  const notificationDialog = useNotificationDialog()
+  
+  // 如果未认证，显示登录页面
+  if (!isAuthenticated) {
+    return <AdminLoginPage />
+  }
   const toggleLang = () => setLang(prev => prev === 'zh' ? 'en' : 'zh')
 
   // 模拟访问短链
@@ -66,11 +79,17 @@ export default function Home() {
         window.location.href = data.originalUrl
       } else {
         const error = await response.json()
-        alert(error.error || t('accessFailed'))
+        notificationDialog.notify({
+          type: 'error',
+          message: error.error || t('accessFailed')
+        })
       }
     } catch (error) {
       console.error('访问失败:', error)
-      alert(t('accessFailed'))
+      notificationDialog.notify({
+        type: 'error',
+        message: t('accessFailed')
+      })
     }
   }
 
@@ -121,6 +140,24 @@ export default function Home() {
       <footer className="text-center py-8 text-slate-400 text-sm">
         <p>{t('footer')}</p>
       </footer>
+
+      {/* 通知对话框 */}
+      <NotificationDialog
+        isOpen={notificationDialog.isOpen}
+        onClose={notificationDialog.onClose}
+        title={notificationDialog.options.title}
+        message={notificationDialog.options.message}
+        type={notificationDialog.options.type}
+        confirmText={notificationDialog.options.confirmText}
+      />
     </div>
+  )
+}
+
+export default function Home() {
+  return (
+    <AdminProvider>
+      <HomeContent />
+    </AdminProvider>
   )
 }

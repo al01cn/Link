@@ -57,7 +57,7 @@ export async function DELETE(
     
     return NextResponse.json({ 
       error: '服务器内部错误', 
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
+      details: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined 
     }, { status: 500 })
   }
 }

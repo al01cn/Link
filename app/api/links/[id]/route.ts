@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { decryptPassword } from '@/lib/crypto'
+import { verifyAdminToken } from '@/lib/adminAuth'
 
 // 获取单个短链信息（包括密码）
 export async function GET(
@@ -15,12 +16,10 @@ export async function GET(
       return NextResponse.json({ error: '无效的ID' }, { status: 400 })
     }
 
-    // 检查管理员权限（简单的验证）
-    const adminKey = request.headers.get('x-admin-key')
-    const expectedAdminKey = process.env.ADMIN_KEY || 'admin-default-key'
-    
-    if (adminKey !== expectedAdminKey) {
-      return NextResponse.json({ error: '无权限访问' }, { status: 403 })
+    // 检查管理员权限
+    const adminPayload = verifyAdminToken(request)
+    if (!adminPayload) {
+      return NextResponse.json({ error: '需要管理员权限' }, { status: 401 })
     }
 
     const link = await prisma.shortLink.findUnique({
