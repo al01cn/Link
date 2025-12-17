@@ -15,6 +15,7 @@
 
 import { useState } from 'react'
 import { Book, ChevronDown, ChevronRight, Copy, Check, X, Download, ExternalLink } from 'lucide-react'
+import { useLanguage } from '@/lib/LanguageContext'
 
 /**
  * API端点接口定义（API endpoint interface definition）
@@ -69,36 +70,37 @@ interface ApiEndpoint {
 }
 
 /**
- * API端点配置数组（API endpoints configuration array）
+ * 获取API端点配置数组（Get API endpoints configuration array）
  * @description 包含所有可用API端点的完整定义和文档（Contains complete definitions and documentation for all available API endpoints）
- * @type {ApiEndpoint[]}
+ * @param t 翻译函数（Translation function）
+ * @returns {ApiEndpoint[]} API端点数组（API endpoints array）
  */
-const API_ENDPOINTS: ApiEndpoint[] = [
+const getApiEndpoints = (t: (key: any, params?: Record<string, string | number>) => string): ApiEndpoint[] => [
   {
     method: 'POST',
     path: '/api/links',
-    summary: '创建短链',
-    description: '创建一个新的短链接，支持自定义路径、密码保护、过期时间等功能',
+    summary: t('createShortLink'),
+    description: t('createShortLinkDesc'),
     requestBody: {
       type: 'object',
       properties: {
-        originalUrl: { type: 'string', required: true, description: '原始URL地址', example: 'https://example.com' },
-        customPath: { type: 'string', required: false, description: '自定义短链路径', example: 'my-link' },
-        password: { type: 'string', required: false, description: '访问密码', example: 'secret123' },
-        expiresAt: { type: 'string', required: false, description: '过期时间 (ISO 8601)', example: '2024-12-31T23:59:59Z' },
-        requireConfirm: { type: 'boolean', required: false, description: '是否需要确认跳转', example: false },
-        enableIntermediate: { type: 'boolean', required: false, description: '是否启用中间页', example: true }
+        originalUrl: { type: 'string', required: true, description: t('originalUrlDesc'), example: 'https://example.com' },
+        customPath: { type: 'string', required: false, description: t('customPathDesc'), example: 'my-link' },
+        password: { type: 'string', required: false, description: t('passwordDesc'), example: 'secret123' },
+        expiresAt: { type: 'string', required: false, description: t('expiresAtDesc'), example: '2024-12-31T23:59:59Z' },
+        requireConfirm: { type: 'boolean', required: false, description: t('requireConfirmDesc'), example: false },
+        enableIntermediate: { type: 'boolean', required: false, description: t('enableIntermediateDesc'), example: true }
       }
     },
     responses: {
       '200': {
-        description: '创建成功',
+        description: t('apiCreateSuccess'),
         example: {
           id: 1,
           path: 'abc123',
           shortUrl: 'http://localhost:3000/abc123',
           originalUrl: 'https://example.com',
-          title: 'Example Domain',
+          title: t('exampleDomain'),
           views: 0,
           createdAt: '2024-01-01T00:00:00Z',
           hasPassword: false,
@@ -106,26 +108,26 @@ const API_ENDPOINTS: ApiEndpoint[] = [
           enableIntermediate: true
         }
       },
-      '400': { description: '请求参数错误' },
-      '403': { description: '域名访问被禁止' },
-      '500': { description: '服务器错误' }
+      '400': { description: t('apiRequestParamError') },
+      '403': { description: t('apiDomainAccessForbidden') },
+      '500': { description: t('apiServerError') }
     }
   },
   {
     method: 'GET',
     path: '/api/links',
-    summary: '获取短链列表',
-    description: '获取最近创建的50个短链接列表',
+    summary: t('getShortLinkList'),
+    description: t('getShortLinkListDesc'),
     responses: {
       '200': {
-        description: '获取成功',
+        description: t('apiGetSuccess'),
         example: [
           {
             id: 1,
             path: 'abc123',
             shortUrl: 'http://localhost:3000/abc123',
             originalUrl: 'https://example.com',
-            title: 'Example Domain',
+            title: t('exampleDomain'),
             views: 5,
             createdAt: '2024-01-01T00:00:00Z',
             hasPassword: false,
@@ -134,46 +136,46 @@ const API_ENDPOINTS: ApiEndpoint[] = [
           }
         ]
       },
-      '500': { description: '服务器错误' }
+      '500': { description: t('apiServerError') }
     }
   },
   {
     method: 'GET',
     path: '/api/to',
-    summary: '快速跳转模式',
-    description: '通过 /to 路径实现快速跳转，支持URL参数和Token高级传参。url和token必须提供其中一个，Token优先级高于URL参数。支持三种跳转模式：href（直接跳转，不获取链接信息）、auto（自动跳转，获取链接信息后倒计时）、confirm（二次确认，获取链接信息后显示确认按钮）。Token模式支持独立的人机验证控制。',
+    summary: t('quickRedirectMode'),
+    description: t('quickRedirectModeDesc'),
     parameters: [
-      { name: 'url', type: 'string', required: true, description: '目标URL地址，支持URL编码和未编码格式（与token二选一）', example: 'https://example.com' },
-      { name: 'type', type: 'string', required: false, description: '跳转类型：href=直接跳转（不获取链接信息），auto=自动跳转（获取链接信息后倒计时），confirm=二次确认（获取链接信息后显示确认按钮）。默认：auto', example: 'auto' },
-      { name: 'token', type: 'string', required: true, description: 'Base64编码的JSON配置，支持高级参数设置（与url二选一）。支持turnstile参数控制人机验证', example: 'eyJ1cmwiOiJodHRwczovL2V4YW1wbGUuY29tIiwidHlwZSI6ImF1dG8iLCJ0dXJuc3RpbGUiOnRydWV9' }
+      { name: 'url', type: 'string', required: true, description: t('targetUrlParamDesc'), example: 'https://example.com' },
+      { name: 'type', type: 'string', required: false, description: t('jumpTypeParamDesc'), example: 'auto' },
+      { name: 'token', type: 'string', required: true, description: t('base64EncodedJson'), example: 'eyJ1cmwiOiJodHRwczovL2V4YW1wbGUuY29tIiwidHlwZSI6ImF1dG8iLCJ0dXJuc3RpbGUiOnRydWV9' }
     ],
     responses: {
       '200': {
-        description: '处理成功',
+        description: t('apiProcessingSuccess'),
         example: {
           originalUrl: 'https://example.com',
-          title: 'Example Domain',
+          title: t('exampleDomain'),
           type: 'auto',
           enableIntermediate: true,
-          msg: '正在前往目标链接...',
+          msg: t('redirectingToTarget'),
           captchaEnabled: false
         }
       },
-      '400': { description: '必须提供url或token参数其中一个，或参数格式无效' },
-      '500': { description: '服务器错误' }
+      '400': { description: t('apiMissingUrlOrToken') },
+      '500': { description: t('apiServerError') }
     }
   },
   {
     method: 'GET',
     path: '/api/settings',
-    summary: '获取系统设置',
-    description: '获取系统安全模式、跳转等待时间和域名规则配置',
+    summary: t('getSystemSettings'),
+    description: t('getSystemSettingsDesc'),
     responses: {
       '200': {
-        description: '获取成功',
+        description: t('apiGetSuccess'),
         example: {
-          securityMode: 'whitelist',
-          waitTime: 5,
+          securityMode: 'blacklist',
+          waitTime: 3,
           domainRules: [
             { id: 1, domain: 'example.com', type: 'whitelist', active: true, createdAt: '2024-01-01T00:00:00Z' }
           ]
@@ -185,99 +187,99 @@ const API_ENDPOINTS: ApiEndpoint[] = [
   {
     method: 'PUT',
     path: '/api/settings',
-    summary: '更新系统设置',
-    description: '更新系统安全模式和跳转等待时间配置',
+    summary: t('updateSystemSettings'),
+    description: t('updateSystemSettingsDesc'),
     requestBody: {
       type: 'object',
       properties: {
-        securityMode: { type: 'string', required: false, description: '安全模式 (whitelist/blacklist)', example: 'whitelist' },
-        waitTime: { type: 'number', required: false, description: '跳转等待时间（秒）', example: 5 }
+        securityMode: { type: 'string', required: false, description: t('securityModeDesc'), example: 'blacklist' },
+        waitTime: { type: 'number', required: false, description: t('waitTimeDesc'), example: 3 }
       }
     },
     responses: {
-      '200': { description: '更新成功', example: { success: true } },
-      '500': { description: '服务器错误' }
+      '200': { description: t('apiUpdateSuccess'), example: { success: true } },
+      '500': { description: t('apiServerError') }
     }
   },
   {
     method: 'GET',
     path: '/api/domains',
-    summary: '获取域名规则',
-    description: '获取域名白名单/黑名单规则列表',
+    summary: t('getDomainRules'),
+    description: t('getDomainRulesDesc'),
     parameters: [
-      { name: 'type', type: 'string', required: false, description: '规则类型 (whitelist/blacklist)', example: 'whitelist' }
+      { name: 'type', type: 'string', required: false, description: t('ruleTypeDesc'), example: 'whitelist' }
     ],
     responses: {
       '200': {
-        description: '获取成功',
+        description: t('apiGetSuccess'),
         example: [
           { id: 1, domain: 'example.com', type: 'whitelist', active: true, createdAt: '2024-01-01T00:00:00Z' }
         ]
       },
-      '500': { description: '服务器错误' }
+      '500': { description: t('apiServerError') }
     }
   },
   {
     method: 'POST',
     path: '/api/domains',
-    summary: '添加域名规则',
-    description: '添加新的域名白名单或黑名单规则',
+    summary: t('addDomainRule'),
+    description: t('addDomainRuleDesc'),
     requestBody: {
       type: 'object',
       properties: {
-        domain: { type: 'string', required: true, description: '域名', example: 'example.com' },
-        type: { type: 'string', required: true, description: '规则类型 (whitelist/blacklist)', example: 'whitelist' }
+        domain: { type: 'string', required: true, description: t('domainDesc'), example: 'example.com' },
+        type: { type: 'string', required: true, description: t('ruleTypeDesc'), example: 'whitelist' }
       }
     },
     responses: {
       '200': {
-        description: '添加成功',
+        description: t('apiCreateSuccess'),
         example: { id: 1, domain: 'example.com', type: 'whitelist', active: true, createdAt: '2024-01-01T00:00:00Z' }
       },
-      '400': { description: '域名格式无效或已存在' },
-      '500': { description: '服务器错误' }
+      '400': { description: t('apiInvalidDomainFormat') },
+      '500': { description: t('apiServerError') }
     }
   },
   {
     method: 'POST',
     path: '/api/check-domain',
-    summary: '检查域名访问权限',
-    description: '检查指定URL的域名是否允许创建短链',
+    summary: t('checkDomainAccess'),
+    description: t('checkDomainAccessDesc'),
     requestBody: {
       type: 'object',
       properties: {
-        url: { type: 'string', required: true, description: '要检查的URL', example: 'https://example.com' }
+        url: { type: 'string', required: true, description: t('urlToCheckDesc'), example: 'https://example.com' }
       }
     },
     responses: {
       '200': {
-        description: '检查完成',
+        description: t('checkCompleteDesc'),
         example: {
           allowed: true,
-          reason: '域名在白名单中',
+          reason: t('domainInWhitelistDesc'),
           domain: 'example.com',
-          securityMode: 'whitelist'
+          securityMode: 'blacklist'
         }
       },
-      '400': { description: '缺少URL参数或URL无效' },
-      '500': { description: '服务器错误' }
+      '400': { description: t('apiMissingUrlParam') },
+      '500': { description: t('apiServerError') }
     }
   },
   {
     method: 'POST',
     path: '/api/admin/login',
-    summary: '管理员登录',
-    description: '管理员账户登录，获取访问令牌',
+    summary: t('adminLogin'),
+    description: t('adminLoginDesc'),
     requestBody: {
       type: 'object',
       properties: {
-        username: { type: 'string', required: true, description: '用户名', example: 'admin' },
-        password: { type: 'string', required: true, description: '密码', example: 'password123' }
+        username: { type: 'string', required: true, description: t('usernameParamDesc'), example: 'admin' },
+        password: { type: 'string', required: true, description: t('passwordParamDesc'), example: 'password123' }
       }
     },
     responses: {
       '200': {
-        description: '登录成功',
+        description: t('apiLoginSuccess'),
         example: {
           success: true,
           token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
@@ -285,148 +287,148 @@ const API_ENDPOINTS: ApiEndpoint[] = [
           username: 'admin'
         }
       },
-      '400': { description: '用户名和密码不能为空' },
-      '401': { description: '用户名或密码错误' },
-      '500': { description: '服务器错误' }
+      '400': { description: t('apiUsernamePasswordRequired') },
+      '401': { description: t('apiInvalidCredentials') },
+      '500': { description: t('apiServerError') }
     }
   },
   {
     method: 'POST',
     path: '/api/admin/change-password',
-    summary: '修改管理员密码',
-    description: '修改管理员用户名和密码，需要管理员权限',
+    summary: t('changeAdminPassword'),
+    description: t('changeAdminPasswordDesc'),
     requestBody: {
       type: 'object',
       properties: {
-        currentPassword: { type: 'string', required: true, description: '当前密码', example: 'oldpassword' },
-        newUsername: { type: 'string', required: true, description: '新用户名', example: 'newadmin' },
-        newPassword: { type: 'string', required: true, description: '新密码（至少6位）', example: 'newpassword123' }
+        currentPassword: { type: 'string', required: true, description: t('currentPasswordParamDesc'), example: 'oldpassword' },
+        newUsername: { type: 'string', required: true, description: t('newUsernameParamDesc'), example: 'newadmin' },
+        newPassword: { type: 'string', required: true, description: t('newPasswordParamDesc'), example: 'newpassword123' }
       }
     },
     responses: {
       '200': {
-        description: '修改成功',
+        description: t('apiModifySuccess'),
         example: {
           success: true,
-          message: '管理员信息修改成功'
+          message: t('apiAdminInfoModified')
         }
       },
-      '400': { description: '参数错误或用户名已存在' },
-      '401': { description: '未授权或当前密码错误' },
-      '404': { description: '管理员账户不存在' },
-      '500': { description: '服务器错误' }
+      '400': { description: t('apiParamErrorOrUserExists') },
+      '401': { description: t('apiUnauthorizedOrWrongPassword') },
+      '404': { description: t('apiAdminNotFound') },
+      '500': { description: t('apiServerError') }
     }
   },
   {
     method: 'GET',
     path: '/api/links/{id}',
-    summary: '获取短链详情',
-    description: '获取单个短链的详细信息，包括密码（需要管理员权限）',
+    summary: t('getShortLinkDetails'),
+    description: t('getShortLinkDetailsDesc'),
     parameters: [
-      { name: 'id', type: 'number', required: true, description: '短链ID', example: 1 }
+      { name: 'id', type: 'number', required: true, description: t('shortLinkIdDesc'), example: 1 }
     ],
     responses: {
       '200': {
-        description: '获取成功',
+        description: t('apiGetSuccess'),
         example: {
           id: 1,
           password: 'decrypted-password',
           hasPassword: true
         }
       },
-      '400': { description: '无效的ID' },
-      '401': { description: '需要管理员权限' },
-      '404': { description: '短链不存在' },
-      '500': { description: '服务器错误' }
+      '400': { description: t('apiInvalidId') },
+      '401': { description: t('apiAdminRequired') },
+      '404': { description: t('apiLinkNotFound') },
+      '500': { description: t('apiServerError') }
     }
   },
   {
     method: 'DELETE',
     path: '/api/links/{id}',
-    summary: '删除短链',
-    description: '删除指定的短链接',
+    summary: t('deleteShortLink'),
+    description: t('deleteShortLinkDesc'),
     parameters: [
-      { name: 'id', type: 'number', required: true, description: '短链ID', example: 1 }
+      { name: 'id', type: 'number', required: true, description: t('shortLinkIdDesc'), example: 1 }
     ],
     responses: {
-      '200': { description: '删除成功', example: { success: true } },
-      '400': { description: '无效的ID' },
-      '500': { description: '服务器错误' }
+      '200': { description: t('apiDeleteSuccess'), example: { success: true } },
+      '400': { description: t('apiInvalidId') },
+      '500': { description: t('apiServerError') }
     }
   },
   {
     method: 'DELETE',
     path: '/api/domains/{id}',
-    summary: '删除域名规则',
-    description: '删除指定的域名规则',
+    summary: t('deleteDomainRule'),
+    description: t('deleteDomainRuleDesc'),
     parameters: [
-      { name: 'id', type: 'string', required: true, description: '域名规则UUID', example: '123e4567-e89b-12d3-a456-426614174000' }
+      { name: 'id', type: 'string', required: true, description: t('domainRuleUuidDesc'), example: '123e4567-e89b-12d3-a456-426614174000' }
     ],
     responses: {
       '200': {
-        description: '删除成功',
+        description: t('apiDeleteSuccess'),
         example: {
           success: true,
-          message: '删除成功',
+          message: t('apiDeleteSuccess'),
           deletedRule: { id: '123e4567-e89b-12d3-a456-426614174000', domain: 'example.com' }
         }
       },
-      '400': { description: '无效的ID格式或存在关联数据' },
-      '404': { description: '域名规则不存在' },
-      '500': { description: '服务器错误' }
+      '400': { description: t('apiInvalidIdFormat') },
+      '404': { description: t('apiDomainRuleNotFound') },
+      '500': { description: t('apiServerError') }
     }
   },
   {
     method: 'GET',
     path: '/api/visit/{path}',
-    summary: '获取短链信息',
-    description: '通过短链路径获取链接信息，用于跳转前的预处理',
+    summary: t('getShortLinkInfo'),
+    description: t('getShortLinkInfoDesc'),
     parameters: [
-      { name: 'path', type: 'string', required: true, description: '短链路径', example: 'abc123' }
+      { name: 'path', type: 'string', required: true, description: t('shortLinkPathDesc'), example: 'abc123' }
     ],
     responses: {
       '200': {
-        description: '获取成功',
+        description: t('apiGetSuccess'),
         example: {
           id: 1,
           originalUrl: 'https://example.com',
-          title: 'Example Domain',
+          title: t('exampleDomain'),
           hasPassword: false,
           requireConfirm: true,
           enableIntermediate: true
         }
       },
-      '404': { description: '短链不存在' },
-      '410': { description: '短链已过期' },
-      '500': { description: '服务器错误' }
+      '404': { description: t('apiLinkNotFound') },
+      '410': { description: t('apiLinkExpired') },
+      '500': { description: t('apiServerError') }
     }
   },
   {
     method: 'POST',
     path: '/api/visit/{path}',
-    summary: '访问短链',
-    description: '验证密码并记录访问，返回目标URL',
+    summary: t('visitShortLink'),
+    description: t('visitShortLinkDesc'),
     parameters: [
-      { name: 'path', type: 'string', required: true, description: '短链路径', example: 'abc123' }
+      { name: 'path', type: 'string', required: true, description: t('shortLinkPathDesc'), example: 'abc123' }
     ],
     requestBody: {
       type: 'object',
       properties: {
-        password: { type: 'string', required: false, description: '访问密码（如果需要）', example: 'secret123' }
+        password: { type: 'string', required: false, description: t('accessPasswordIfNeededDesc'), example: 'secret123' }
       }
     },
     responses: {
       '200': {
-        description: '访问成功',
+        description: t('apiGetSuccess'),
         example: {
           originalUrl: 'https://example.com',
-          title: 'Example Domain'
+          title: t('exampleDomain')
         }
       },
-      '401': { description: '密码错误' },
-      '404': { description: '短链不存在' },
-      '410': { description: '短链已过期' },
-      '500': { description: '服务器错误' }
+      '401': { description: t('apiPasswordRequired') },
+      '404': { description: t('apiLinkNotFound') },
+      '410': { description: t('apiLinkExpired') },
+      '500': { description: t('apiServerError') }
     }
   }
 ]
@@ -436,34 +438,34 @@ const API_ENDPOINTS: ApiEndpoint[] = [
  * @description 定义/to路径的跳转规则、参数说明和使用示例（Defines redirect rules, parameter descriptions and usage examples for /to path）
  * @type {Object}
  */
-const TO_REDIRECT_RULES = {
-  title: 'TO 跳转传参规则',
-  description: '通过 /to 路径实现快速跳转，支持URL参数和Token高级传参，提供三种跳转模式',
+const getToRedirectRules = (t: (key: any, params?: Record<string, string | number>) => string) => ({
+  title: t('toRedirectRulesTitle'),
+  description: t('toRedirectRulesDesc'),
   /** 跳转规则数组（Redirect rules array） */
   rules: [
     {
-      pattern: '/to?url={目标URL}',
-      description: 'URL参数跳转（基础模式）',
+      pattern: t('targetUrlPattern'),
+      description: t('urlParamRedirect'),
       example: '/to?url=https://example.com',
-      note: '支持URL编码和未编码的URL，默认为自动跳转模式（type=auto）'
+      note: t('urlParamNote')
     },
     {
-      pattern: '/to?url={目标URL}&type={跳转类型}',
-      description: '控制跳转类型',
+      pattern: t('targetUrlTypePattern'),
+      description: t('controlRedirectType'),
       example: '/to?url=https://example.com&type=confirm',
-      note: 'type支持：href（直接跳转，不获取链接信息）、auto（自动跳转，获取链接信息后倒计时）、confirm（二次确认，获取链接信息后显示确认按钮）'
+      note: t('typeParamNote')
     },
     {
-      pattern: '/to?token={Base64编码}',
-      description: 'Token参数跳转（高级模式）',
+      pattern: t('tokenPattern'),
+      description: t('tokenParamRedirect'),
       example: '/to?token=eyJ1cmwiOiJodHRwczovL2V4YW1wbGUuY29tIiwidHlwZSI6ImNvbmZpcm0ifQ==',
-      note: 'Token优先级高于URL参数，支持更多自定义选项'
+      note: t('tokenParamNote')
     },
     {
-      pattern: '/to?url={目标URL}&token={Base64编码}',
-      description: '混合参数（Token优先）',
+      pattern: t('targetUrlTokenPattern'),
+      description: t('mixedParams'),
       example: '/to?url=https://backup.com&token=eyJ1cmwiOiJodHRwczovL2V4YW1wbGUuY29tIn0=',
-      note: '当URL和Token同时存在时，优先使用Token中的配置'
+      note: t('mixedParamNote')
     }
   ],
   /** 参数说明数组（Parameters description array） */
@@ -472,21 +474,21 @@ const TO_REDIRECT_RULES = {
       name: 'url',
       type: 'string',
       required: true,
-      description: '目标URL地址，支持URL编码和未编码格式（与token二选一，必填其中一个）',
+      description: t('targetUrlDesc'),
       example: 'https://example.com 或 https%3A%2F%2Fexample.com'
     },
     {
       name: 'type',
       type: 'string',
       required: false,
-      description: '跳转类型：href=直接跳转（不获取链接信息），auto=自动跳转（获取链接信息后倒计时），confirm=二次确认（获取链接信息后显示确认按钮）。默认：auto',
+      description: t('jumpTypeDesc'),
       example: 'auto'
     },
     {
       name: 'token',
       type: 'string',
       required: true,
-      description: 'Base64编码的JSON配置，支持高级参数设置（与url二选一，必填其中一个）',
+      description: t('tokenConfigDesc2'),
       example: 'eyJ1cmwiOiJodHRwczovL2V4YW1wbGUuY29tIiwidHlwZSI6ImF1dG8ifQ=='
     }
   ],
@@ -495,47 +497,47 @@ const TO_REDIRECT_RULES = {
     url: {
       type: 'string',
       required: true,
-      description: '目标URL地址',
+      description: t('targetUrlSimpleDesc'),
       example: 'https://example.com'
     },
     type: {
       type: 'string',
       required: false,
-      description: '跳转类型：href=直接跳转（不获取链接信息），auto=自动跳转（获取链接信息后倒计时），confirm=二次确认（获取链接信息后显示确认按钮）',
+      description: t('jumpTypeDesc'),
       example: 'auto',
       default: 'auto'
     },
     title: {
       type: 'string',
       required: false,
-      description: '页面标题，在跳转页面显示',
-      example: '跳转到示例网站',
-      default: '自动获取'
+      description: t('pageTitle'),
+      example: t('jumpToExampleSite'),
+      default: t('autoRetrieve')
     },
     msg: {
       type: 'string',
       required: false,
-      description: '子标题消息，在跳转页面显示',
-      example: '请稍候，正在为您跳转...',
-      default: '正在前往目标链接...'
+      description: t('subtitleMessage'),
+      example: t('pleaseWaitRedirecting'),
+      default: t('redirectingToTargetDefault')
     },
     turnstile: {
       type: 'boolean',
       required: false,
-      description: '是否启用 Cloudflare Turnstile 人机验证，独立于全局设置',
+      description: t('enableTurnstileVerification'),
       example: 'true',
       default: 'false'
     }
   },
   /** 优先级规则数组（Priority rules array） */
   priority: [
-    '1. url和token参数必须提供其中一个，两者都缺失将返回400错误',
-    '2. Token参数优先级最高，如果存在Token则忽略URL参数',
-    '3. type参数默认值为auto（自动跳转），可通过参数控制跳转类型',
-    '4. 三种跳转模式：href（直接跳转，不获取链接信息）、auto（自动跳转，获取链接信息后倒计时）、confirm（二次确认，获取链接信息后显示确认按钮）',
-    '5. title和msg在所有模式下都会显示在跳转页面'
+    t('priorityRule1'),
+    t('priorityRule2'),
+    t('priorityRule3'),
+    t('priorityRule4'),
+    t('priorityRule5')
   ]
-}
+})
 
 /**
  * API文档组件属性接口（API documentation component props interface）
@@ -566,12 +568,18 @@ interface ApiDocumentationProps {
  * ```
  */
 export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationProps) {
+  const { t, language } = useLanguage()
   /** 展开的端点集合（Set of expanded endpoints） */
   const [expandedEndpoints, setExpandedEndpoints] = useState<Set<string>>(new Set())
   /** 当前复制的文本标识（Current copied text identifier） */
   const [copiedText, setCopiedText] = useState<string | null>(null)
   /** 当前激活的标签页（Currently active tab） */
   const [activeTab, setActiveTab] = useState<'endpoints' | 'to-rules' | 'openapi'>('endpoints')
+
+  // 获取本地化的 API 端点数据
+  const apiEndpoints = getApiEndpoints(t)
+  // 获取本地化的 TO 跳转规则数据
+  const toRedirectRules = getToRedirectRules(t)
 
   /**
    * 切换端点展开状态（Toggle endpoint expansion state）
@@ -603,7 +611,7 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
       setCopiedText(key)
       setTimeout(() => setCopiedText(null), 2000)
     } catch (err) {
-      console.error('复制失败:', err)
+      console.error(t('copyFailed') + ':', err)
     }
   }
 
@@ -641,8 +649,8 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
               <Book size={18} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">API 文档</h2>
-              <p className="text-sm text-gray-600">ShortLink API 接口文档</p>
+              <h2 className="text-xl font-bold text-gray-900">{t('apiDocumentation')}</h2>
+              <p className="text-sm text-gray-600">ShortLink API {t('apiDocumentation')}</p>
             </div>
           </div>
           <button
@@ -664,7 +672,7 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
-              API 接口
+              {t('apiEndpoints')}
             </button>
             <button
               onClick={() => setActiveTab('to-rules')}
@@ -674,7 +682,7 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
-              TO 跳转规则
+              {t('toRedirectRules')}
             </button>
             <button
               onClick={() => setActiveTab('openapi')}
@@ -684,7 +692,7 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
-              OpenAPI 规范
+              {t('openApiSpec')}
             </button>
           </div>
           
@@ -693,7 +701,7 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
             <button
               onClick={() => window.open('/api/openapi', '_blank')}
               className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
-              title="查看 OpenAPI 规范"
+              title={t('viewOpenApiSpec')}
             >
               <ExternalLink size={16} />
               OpenAPI
@@ -720,14 +728,14 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
                   document.body.removeChild(link)
                   URL.revokeObjectURL(url)
                 } catch (error) {
-                  console.error('下载OpenAPI规范失败:', error)
+                  console.error(t('downloadOpenApiSpecFailed') + ':', error)
                 }
               }}
               className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
-              title="下载 OpenAPI 规范文件"
+              title={t('downloadOpenApiSpecFile')}
             >
               <Download size={16} />
-              下载
+              {t('download')}
             </button>
           </div>
         </div>
@@ -736,7 +744,7 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
         <div className="flex-1 overflow-auto p-6">
           {activeTab === 'endpoints' ? (
             <div className="space-y-4">
-              {API_ENDPOINTS.map((endpoint, index) => {
+              {apiEndpoints.map((endpoint, index) => {
                 const key = `${endpoint.method}-${endpoint.path}`
                 const isExpanded = expandedEndpoints.has(key)
                 
@@ -767,13 +775,13 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
                         {/* 请求参数 */}
                         {endpoint.parameters && (
                           <div>
-                            <h4 className="font-semibold text-gray-900 mb-2">请求参数</h4>
+                            <h4 className="font-semibold text-gray-900 mb-2">{t('requestParameters')}</h4>
                             <div className="bg-gray-50 rounded-lg p-3">
                               {endpoint.parameters.map((param, i) => (
                                 <div key={i} className="flex items-start gap-3 py-2">
                                   <code className="text-sm font-mono text-blue-600">{param.name}</code>
                                   <span className={`px-2 py-1 rounded text-xs ${param.required ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'}`}>
-                                    {param.required ? '必需' : '可选'}
+                                    {param.required ? t('required') : t('optional')}
                                   </span>
                                   <span className="text-sm text-gray-600">{param.type}</span>
                                   <span className="text-sm text-gray-700 flex-1">{param.description}</span>
@@ -786,13 +794,13 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
                         {/* 请求体 */}
                         {endpoint.requestBody && (
                           <div>
-                            <h4 className="font-semibold text-gray-900 mb-2">请求体</h4>
+                            <h4 className="font-semibold text-gray-900 mb-2">{t('requestBody')}</h4>
                             <div className="bg-gray-50 rounded-lg p-3">
                               {Object.entries(endpoint.requestBody.properties).map(([key, prop]) => (
                                 <div key={key} className="flex items-start gap-3 py-2">
                                   <code className="text-sm font-mono text-blue-600">{key}</code>
                                   <span className={`px-2 py-1 rounded text-xs ${prop.required ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'}`}>
-                                    {prop.required ? '必需' : '可选'}
+                                    {prop.required ? t('required') : t('optional')}
                                   </span>
                                   <span className="text-sm text-gray-600">{prop.type}</span>
                                   <span className="text-sm text-gray-700 flex-1">{prop.description}</span>
@@ -804,7 +812,7 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
 
                         {/* 响应示例 */}
                         <div>
-                          <h4 className="font-semibold text-gray-900 mb-2">响应示例</h4>
+                          <h4 className="font-semibold text-gray-900 mb-2">{t('responseExample')}</h4>
                           {Object.entries(endpoint.responses).map(([status, response]) => (
                             <div key={status} className="mb-3">
                               <div className="flex items-center gap-2 mb-2">
@@ -817,6 +825,7 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
                               </div>
                               {response.example && (
                                 <div className="relative">
+                                  <p className="text-sm text-gray-600 mb-2">{t('example')}:</p>
                                   <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-sm overflow-x-auto">
                                     <code>{JSON.stringify(response.example, null, 2)}</code>
                                   </pre>
@@ -845,11 +854,11 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
             <div className="space-y-6">
               {/* TO 跳转规则 */}
               <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">{TO_REDIRECT_RULES.title}</h3>
-                <p className="text-gray-700 mb-4">{TO_REDIRECT_RULES.description}</p>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">{toRedirectRules.title}</h3>
+                <p className="text-gray-700 mb-4">{toRedirectRules.description}</p>
                 
                 <div className="space-y-4">
-                  {TO_REDIRECT_RULES.rules.map((rule, index) => (
+                  {toRedirectRules.rules.map((rule, index) => (
                     <div key={index} className="border border-gray-200 rounded-lg p-4">
                       <div className="flex items-start gap-3 mb-2">
                         <code className="bg-blue-100 text-blue-800 px-3 py-1 rounded-md text-sm font-mono">
@@ -858,7 +867,7 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
                       </div>
                       <p className="text-gray-700 mb-2">{rule.description}</p>
                       <div className="bg-gray-50 rounded-lg p-3">
-                        <p className="text-sm text-gray-600 mb-1">示例:</p>
+                        <p className="text-sm text-gray-600 mb-1">{t('example')}:</p>
                         <code className="text-sm font-mono text-green-600">{rule.example}</code>
                       </div>
                       <p className="text-sm text-gray-600 mt-2 italic">{rule.note}</p>
@@ -869,13 +878,13 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
 
               {/* 参数说明 */}
               <div>
-                <h4 className="font-semibold text-gray-900 mb-3">参数说明</h4>
+                <h4 className="font-semibold text-gray-900 mb-3">{t('parameterDescription')}</h4>
                 <div className="bg-gray-50 rounded-lg p-4">
-                  {TO_REDIRECT_RULES.parameters.map((param, index) => (
+                  {toRedirectRules.parameters.map((param, index) => (
                     <div key={index} className="flex items-start gap-3 py-2">
                       <code className="text-sm font-mono text-blue-600">{param.name}</code>
                       <span className={`px-2 py-1 rounded text-xs ${param.required ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'}`}>
-                        {param.required ? '必需' : '可选'}
+                        {param.required ? t('required') : t('optional')}
                       </span>
                       <span className="text-sm text-gray-600">{param.type}</span>
                       <span className="text-sm text-gray-700 flex-1">{param.description}</span>
@@ -886,20 +895,20 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
 
               {/* Token配置说明 */}
               <div>
-                <h4 className="font-semibold text-gray-900 mb-3">Token 配置格式</h4>
-                <p className="text-sm text-gray-600 mb-3">Token是Base64编码的JSON对象，支持以下字段：</p>
+                <h4 className="font-semibold text-gray-900 mb-3">{t('tokenConfigFormat')}</h4>
+                <p className="text-sm text-gray-600 mb-3">{t('tokenConfigDesc')}</p>
                 <div className="bg-gray-50 rounded-lg p-4">
-                  {Object.entries(TO_REDIRECT_RULES.tokenSchema).map(([key, schema]) => (
+                  {Object.entries(toRedirectRules.tokenSchema).map(([key, schema]) => (
                     <div key={key} className="flex items-start gap-3 py-2">
                       <code className="text-sm font-mono text-blue-600">{key}</code>
                       <span className={`px-2 py-1 rounded text-xs ${schema.required ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'}`}>
-                        {schema.required ? '必需' : '可选'}
+                        {schema.required ? t('required') : t('optional')}
                       </span>
                       <span className="text-sm text-gray-600">{schema.type}</span>
                       <div className="flex-1">
                         <span className="text-sm text-gray-700">{schema.description}</span>
                         {'default' in schema && schema.default && (
-                          <span className="text-xs text-gray-500 block">默认值: {String(schema.default)}</span>
+                          <span className="text-xs text-gray-500 block">{t('defaultValue')}: {String(schema.default)}</span>
                         )}
                       </div>
                     </div>
@@ -909,10 +918,10 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
 
               {/* 优先级规则 */}
               <div>
-                <h4 className="font-semibold text-gray-900 mb-3">优先级规则</h4>
+                <h4 className="font-semibold text-gray-900 mb-3">{t('priorityRules')}</h4>
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <ul className="text-sm text-gray-700 space-y-1">
-                    {TO_REDIRECT_RULES.priority.map((rule, index) => (
+                    {toRedirectRules.priority.map((rule, index) => (
                       <li key={index} className="flex items-start gap-2">
                         <span className="text-yellow-600 font-bold">•</span>
                         <span>{rule}</span>
@@ -924,28 +933,28 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
 
               {/* 使用示例 */}
               <div>
-                <h4 className="font-semibold text-gray-900 mb-3">使用示例</h4>
+                <h4 className="font-semibold text-gray-900 mb-3">{t('usageExamples')}</h4>
                 <div className="space-y-3">
                   <div className="bg-gray-900 text-gray-100 p-4 rounded-lg">
-                    <p className="text-sm text-gray-400 mb-2"># 基础URL跳转（默认自动跳转）</p>
+                    <p className="text-sm text-gray-400 mb-2"># {t('basicUrlRedirect')}</p>
                     <div className="overflow-x-auto">
                       <code className="text-green-400 text-sm whitespace-nowrap">https://yourdomain.com/to?url=https://github.com</code>
                     </div>
                   </div>
                   <div className="bg-gray-900 text-gray-100 p-4 rounded-lg">
-                    <p className="text-sm text-gray-400 mb-2"># 直接跳转模式</p>
+                    <p className="text-sm text-gray-400 mb-2"># {t('directRedirectMode')}</p>
                     <div className="overflow-x-auto">
                       <code className="text-green-400 text-sm whitespace-nowrap">https://yourdomain.com/to?url=https://github.com&type=href</code>
                     </div>
                   </div>
                   <div className="bg-gray-900 text-gray-100 p-4 rounded-lg">
-                    <p className="text-sm text-gray-400 mb-2"># 二次确认模式</p>
+                    <p className="text-sm text-gray-400 mb-2"># {t('confirmRedirectMode')}</p>
                     <div className="overflow-x-auto">
                       <code className="text-green-400 text-sm whitespace-nowrap">https://yourdomain.com/to?url=https://github.com&type=confirm</code>
                     </div>
                   </div>
                   <div className="bg-gray-900 text-gray-100 p-4 rounded-lg">
-                    <p className="text-sm text-gray-400 mb-2"># Token高级配置</p>
+                    <p className="text-sm text-gray-400 mb-2"># {t('tokenAdvancedConfig')}</p>
                     <div className="overflow-x-auto">
                       <code className="text-green-400 text-xs break-all">
                         https://yourdomain.com/to?token=eyJ1cmwiOiJodHRwczovL2dpdGh1Yi5jb20iLCJ0eXBlIjoiY29uZmlybSIsInRpdGxlIjoi6Lez6L2s5YiwR2l0SHViIiwibXNnIjoi5qyi6L+O6KeE6KeI572R56uZ5Lit5b+DIn0=
@@ -953,18 +962,18 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
                     </div>
                   </div>
                   <div className="bg-gray-900 text-gray-100 p-4 rounded-lg">
-                    <p className="text-sm text-gray-400 mb-2"># Token解码示例</p>
+                    <p className="text-sm text-gray-400 mb-2"># {t('tokenDecodeExample')}</p>
                     <pre className="text-green-400 text-xs overflow-x-auto">
 {`{
   "url": "https://github.com",
   "type": "confirm",
-  "title": "跳转到GitHub",
-  "msg": "欢迎访问网站中心"
+  "title": "${t('jumpToGitHub')}",
+  "msg": "${t('welcomeToWebCenter')}"
 }`}
                     </pre>
                   </div>
                   <div className="bg-gray-900 text-gray-100 p-4 rounded-lg">
-                    <p className="text-sm text-gray-400 mb-2"># 启用人机验证的Token配置</p>
+                    <p className="text-sm text-gray-400 mb-2"># {t('captchaTokenConfig')}</p>
                     <div className="overflow-x-auto">
                       <code className="text-green-400 text-xs break-all">
                         https://yourdomain.com/to?token=eyJ1cmwiOiJodHRwczovL2V4YW1wbGUuY29tIiwidHlwZSI6ImF1dG8iLCJ0dXJuc3RpbGUiOnRydWV9
@@ -972,13 +981,13 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
                     </div>
                   </div>
                   <div className="bg-gray-900 text-gray-100 p-4 rounded-lg">
-                    <p className="text-sm text-gray-400 mb-2"># 人机验证Token解码示例</p>
+                    <p className="text-sm text-gray-400 mb-2"># {t('captchaTokenDecodeExample')}</p>
                     <pre className="text-green-400 text-xs overflow-x-auto">
 {`{
   "url": "https://example.com",
   "type": "auto",
-  "title": "安全跳转",
-  "msg": "正在进行安全验证...",
+  "title": "${t('secureRedirect')}",
+  "msg": "${t('securityVerificationInProgress')}",
   "turnstile": true
 }`}
                     </pre>
@@ -991,28 +1000,28 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
             <div className="space-y-6">
               {/* OpenAPI 规范 */}
               <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-4">OpenAPI 3.0.3 规范</h3>
+                <h3 className="text-lg font-bold text-gray-900 mb-4">{t('openApiVersion')}</h3>
                 <p className="text-gray-700 mb-4">
-                  完整的 API 规范文档，符合 OpenAPI 3.0.3 标准，可用于生成客户端 SDK、API 测试工具等。
+                  {t('openApiDesc')}
                 </p>
                 
                 <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                  <h4 className="font-semibold text-gray-900 mb-2">规范信息</h4>
+                  <h4 className="font-semibold text-gray-900 mb-2">{t('specInfo')}</h4>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="text-gray-600">版本:</span>
+                      <span className="text-gray-600">{t('version')}:</span>
                       <span className="ml-2 font-mono">3.0.3</span>
                     </div>
                     <div>
-                      <span className="text-gray-600">API 版本:</span>
+                      <span className="text-gray-600">{t('apiVersion')}:</span>
                       <span className="ml-2 font-mono">1.0.0</span>
                     </div>
                     <div>
-                      <span className="text-gray-600">格式:</span>
+                      <span className="text-gray-600">{t('format')}:</span>
                       <span className="ml-2 font-mono">JSON</span>
                     </div>
                     <div>
-                      <span className="text-gray-600">编码:</span>
+                      <span className="text-gray-600">{t('encoding')}:</span>
                       <span className="ml-2 font-mono">UTF-8</span>
                     </div>
                   </div>
@@ -1020,44 +1029,44 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
 
                 <div className="space-y-4">
                   <div className="border border-gray-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-gray-900 mb-2">支持的工具</h4>
+                    <h4 className="font-semibold text-gray-900 mb-2">{t('supportedTools')}</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span>Swagger UI - API 文档界面</span>
+                        <span>Swagger UI - {t('apiDocumentationUI')}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span>Postman - API 测试工具</span>
+                        <span>Postman - {t('apiTestingTool')}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span>Insomnia - REST 客户端</span>
+                        <span>Insomnia - {t('restClient')}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span>OpenAPI Generator - 代码生成</span>
+                        <span>OpenAPI Generator - {t('codeGeneration')}</span>
                       </div>
                     </div>
                   </div>
 
                   <div className="border border-gray-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-gray-900 mb-2">使用方法</h4>
+                    <h4 className="font-semibold text-gray-900 mb-2">{t('usageMethod')}</h4>
                     <div className="space-y-3">
                       <div>
-                        <p className="text-sm text-gray-700 mb-2">1. 在 Swagger UI 中导入：</p>
+                        <p className="text-sm text-gray-700 mb-2">1. {t('importInSwagger')}</p>
                         <code className="block bg-gray-900 text-gray-100 p-2 rounded text-xs">
                           {`https://editor.swagger.io/?url=${typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}/api/openapi`}
                         </code>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-700 mb-2">2. 在 Postman 中导入：</p>
+                        <p className="text-sm text-gray-700 mb-2">2. {t('importInPostman')}</p>
                         <code className="block bg-gray-900 text-gray-100 p-2 rounded text-xs">
                           {`File → Import → Link → ${typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}/api/openapi`}
                         </code>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-700 mb-2">3. 使用 curl 获取：</p>
+                        <p className="text-sm text-gray-700 mb-2">3. {t('getCurlCommand')}</p>
                         <code className="block bg-gray-900 text-gray-100 p-2 rounded text-xs">
                           {`curl -X GET ${typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}/api/openapi`}
                         </code>
@@ -1066,14 +1075,14 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
                   </div>
 
                   <div className="border border-gray-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-gray-900 mb-2">规范特性</h4>
+                    <h4 className="font-semibold text-gray-900 mb-2">{t('specFeatures')}</h4>
                     <ul className="text-sm text-gray-700 space-y-1">
-                      <li>• 完整的 API 端点定义</li>
-                      <li>• 详细的请求/响应模式</li>
-                      <li>• 参数验证规则</li>
-                      <li>• 错误响应定义</li>
-                      <li>• 安全认证方案</li>
-                      <li>• 示例数据</li>
+                      <li>• {t('completeApiEndpoints')}</li>
+                      <li>• {t('detailedRequestResponse')}</li>
+                      <li>• {t('parameterValidation')}</li>
+                      <li>• {t('errorResponseDef')}</li>
+                      <li>• {t('securityScheme')}</li>
+                      <li>• {t('exampleData')}</li>
                     </ul>
                   </div>
                 </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Link2, Lock, Shield, Zap, X, ExternalLink, Calendar, Save, AlertCircle } from 'lucide-react'
+import { useLanguage } from '@/lib/LanguageContext'
 
 interface ShortLink {
   id: string
@@ -24,6 +25,7 @@ interface EditPanelProps {
 }
 
 export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPanelProps) {
+  const { t } = useLanguage()
   // 表单状态
   const [originalUrl, setOriginalUrl] = useState('')
   const [customPath, setCustomPath] = useState('')
@@ -63,36 +65,36 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
 
     // URL验证
     if (!originalUrl.trim()) {
-      newErrors.originalUrl = '请输入链接地址'
+      newErrors.originalUrl = t('pleaseEnterUrl')
     } else {
       try {
         new URL(originalUrl)
       } catch {
-        newErrors.originalUrl = '请输入有效的URL格式'
+        newErrors.originalUrl = t('pleaseEnterValidUrl')
       }
     }
 
     // 自定义路径验证
     if (customPath.trim()) {
       if (!/^[a-zA-Z0-9_-]+$/.test(customPath)) {
-        newErrors.customPath = '路径只能包含字母、数字、下划线和连字符'
+        newErrors.customPath = t('pathOnlyLettersNumbers')
       } else if (customPath.length < 3) {
-        newErrors.customPath = '路径长度至少3个字符'
+        newErrors.customPath = t('pathMinLength')
       } else if (customPath.length > 50) {
-        newErrors.customPath = '路径长度不能超过50个字符'
+        newErrors.customPath = t('pathMaxLength')
       }
     }
 
     // 密码验证
     if (password.trim() && password.length < 4) {
-      newErrors.password = '密码长度至少4个字符'
+      newErrors.password = t('passwordMinLength')
     }
 
     // 过期时间验证
     if (expiresAt) {
       const expireDate = new Date(expiresAt)
       if (expireDate <= new Date()) {
-        newErrors.expiresAt = '过期时间必须晚于当前时间'
+        newErrors.expiresAt = t('expireTimeMustBeFuture')
       }
     }
 
@@ -154,7 +156,7 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
             {/* 原始链接 */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                原始链接 <span className="text-red-500">*</span>
+                {t('originalUrl')} <span className="text-red-500">*</span>
               </label>
               <div className={`cute-input-wrapper bg-white rounded-lg px-4 py-3 flex items-center gap-2 ${
                 errors.originalUrl ? 'border-red-300 ring-1 ring-red-300' : ''
@@ -186,7 +188,7 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
               {/* 自定义路径 */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  自定义路径
+                  {t('customPath')}
                 </label>
                 <div className={`cute-input-wrapper bg-white rounded-lg px-4 py-3 flex items-center gap-2 ${
                   errors.customPath ? 'border-red-300 ring-1 ring-red-300' : ''
@@ -196,7 +198,7 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
                   </span>
                   <input 
                     type="text" 
-                    placeholder="自定义路径"
+                    placeholder={t('customPathPlaceholder')}
                     className="w-full bg-transparent outline-none text-slate-800"
                     value={customPath}
                     onChange={(e) => {
@@ -219,7 +221,7 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
               {/* 访问密码 */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  访问密码
+                  {t('accessPassword')}
                 </label>
                 <div className={`cute-input-wrapper bg-white rounded-lg px-4 py-3 flex items-center gap-2 ${
                   errors.password ? 'border-red-300 ring-1 ring-red-300' : ''
@@ -227,7 +229,7 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
                   <Lock size={18} className="text-slate-400" />
                   <input 
                     type="text" 
-                    placeholder="设置访问密码"
+                    placeholder={t('setAccessPassword')}
                     className="w-full bg-transparent outline-none text-slate-800"
                     value={password}
                     onChange={(e) => {
@@ -247,7 +249,7 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
                 )}
                 {link.hasPassword && !password.trim() && (
                   <p className="text-xs text-amber-600 mt-1">
-                    当前已设置密码，留空表示保持原密码不变
+                    {t('currentPasswordSet')}
                   </p>
                 )}
               </div>
@@ -256,7 +258,7 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
             {/* 过期时间 */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                过期时间
+                {t('editPanelExpirationTime')}
               </label>
               <div className={`cute-input-wrapper bg-white rounded-lg px-4 py-3 flex items-center gap-2 ${
                 errors.expiresAt ? 'border-red-300 ring-1 ring-red-300' : ''
@@ -282,7 +284,7 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
                 </p>
               )}
               <p className="text-xs text-slate-500 mt-1">
-                留空表示永不过期
+                {t('leaveEmptyForNeverExpire')}
               </p>
             </div>
 
@@ -298,7 +300,7 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
                     <Zap size={16} />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-slate-700">启用过渡页</span>
+                    <span className="text-sm font-medium text-slate-700">{t('enableTransitionPage')}</span>
                     <span className="text-xs text-slate-500">
                       {password.trim() ? '设置密码时自动启用' : '显示跳转确认页面'}
                     </span>

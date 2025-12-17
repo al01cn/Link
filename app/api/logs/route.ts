@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { translateForRequest } from '@/lib/translations'
 
 const prisma = new PrismaClient()
 
 /**
  * 日志类型枚举（Log type enumeration）
  */
-type LogType = 'visit' | 'create' | 'error'
+type LogType = 'visit' | 'create' | 'error' | 'prepare'
 
 /**
  * 日志条目接口（Log entry interface）
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<LogEntry[]
 
   } catch (error) {
     console.error('获取日志失败:', error)
-    return NextResponse.json({ error: '获取日志失败' }, { status: 500 })
+    return NextResponse.json({ error: translateForRequest(request, 'serverError') }, { status: 500 })
   }
 }
 
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<{ success
     const { type, message, details } = body
 
     if (!type || !message) {
-      return NextResponse.json({ error: '缺少必需参数' }, { status: 400 })
+      return NextResponse.json({ error: translateForRequest(request, 'invalidRequestParams') }, { status: 400 })
     }
 
     // 获取客户端信息
@@ -97,6 +98,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<{ success
 
   } catch (error) {
     console.error('记录日志失败:', error)
-    return NextResponse.json({ error: '记录日志失败' }, { status: 500 })
+    return NextResponse.json({ error: translateForRequest(request, 'serverError') }, { status: 500 })
   }
 }

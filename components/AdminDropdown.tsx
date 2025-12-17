@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { User, Settings, LogOut, ChevronDown } from 'lucide-react'
 import { useAdmin } from '@/lib/AdminContext'
+import { useLanguage } from '@/lib/LanguageContext'
 import AdminSettings from './AdminSettings'
 
 export default function AdminDropdown() {
@@ -10,6 +11,7 @@ export default function AdminDropdown() {
   const [showSettings, setShowSettings] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const { username, logout } = useAdmin()
+  const { t } = useLanguage()
 
   // 点击外部关闭下拉菜单
   useEffect(() => {
@@ -56,7 +58,7 @@ export default function AdminDropdown() {
               className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
             >
               <Settings size={16} className="text-slate-400" />
-              管理员设置
+              {t('adminSettings')}
             </button>
             <hr className="my-1 border-slate-100" />
             <button
@@ -64,7 +66,7 @@ export default function AdminDropdown() {
               className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors"
             >
               <LogOut size={16} className="text-red-400" />
-              登出
+              {t('logout')}
             </button>
           </div>
         )}

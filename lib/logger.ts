@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server'
 /**
  * 日志类型枚举
  */
-export type LogType = 'visit' | 'create' | 'error'
+export type LogType = 'visit' | 'create' | 'error' | 'prepare'
 
 /**
  * 日志记录选项接口

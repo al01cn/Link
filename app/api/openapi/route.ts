@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { translateForRequest } from '@/lib/translations'
 
 /**
  * 动态生成OpenAPI规范（Generate OpenAPI specification dynamically）
@@ -23,7 +24,7 @@ import { NextResponse } from 'next/server'
  *   "components": { ... }
  * }
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
     /** 
      * 基础URL地址（Base URL address）
@@ -1183,6 +1184,6 @@ export async function GET() {
      *              When any error occurs during OpenAPI specification generation, log the error and return standard error response
      */
     console.error('生成OpenAPI规范失败:', error)
-    return NextResponse.json({ error: '无法生成API规范' }, { status: 500 })
+    return NextResponse.json({ error: translateForRequest(request, 'downloadOpenApiSpecFailed') }, { status: 500 })
   }
 }

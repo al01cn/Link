@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Link2, Home } from 'lucide-react'
-import { useTranslation } from '@/lib/translations'
+import { useLanguage, LanguageProvider } from '@/lib/LanguageContext'
 
-export default function NotFound() {
+function NotFoundContent() {
   const [isClient, setIsClient] = useState(false)
-  const t = useTranslation('zh') // 默认中文，实际项目中可以从context获取
+  const { t } = useLanguage()
   
   // 客户端水合完成后启用动画
   useEffect(() => {
@@ -53,5 +53,13 @@ export default function NotFound() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function NotFound() {
+  return (
+    <LanguageProvider>
+      <NotFoundContent />
+    </LanguageProvider>
   )
 }

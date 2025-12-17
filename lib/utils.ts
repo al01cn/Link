@@ -30,6 +30,58 @@ export function extractDomain(url: string): string {
   }
 }
 
+// 验证域名规则格式
+export function validateDomainRule(domain: string): {
+  isValid: boolean
+  error?: string
+  normalizedDomain?: string
+} {
+  if (!domain || !domain.trim()) {
+    return { isValid: false, error: '域名不能为空' }
+  }
+
+  const trimmedDomain = domain.trim().toLowerCase()
+
+  // 检查是否包含协议
+  if (trimmedDomain.includes('://')) {
+    return { isValid: false, error: '请输入域名，不要包含协议（如 http://）' }
+  }
+
+  // 检查是否包含路径
+  if (trimmedDomain.includes('/')) {
+    return { isValid: false, error: '请输入域名，不要包含路径' }
+  }
+
+  // 支持的格式：
+  // 1. *.example.com - 匹配所有子域名（包括主域名）
+  // 2. example.com - 只匹配主域名
+  // 3. sub.example.com - 只匹配特定子域名
+
+  if (trimmedDomain.startsWith('*.')) {
+    // 通配符格式验证
+    const baseDomain = trimmedDomain.substring(2)
+    if (!baseDomain || baseDomain.includes('*')) {
+      return { isValid: false, error: '通配符格式错误，应为 *.example.com' }
+    }
+    
+    // 验证基础域名格式
+    const domainRegex = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/
+    if (!domainRegex.test(baseDomain)) {
+      return { isValid: false, error: '域名格式不正确' }
+    }
+    
+    return { isValid: true, normalizedDomain: trimmedDomain }
+  } else {
+    // 普通域名格式验证
+    const domainRegex = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/
+    if (!domainRegex.test(trimmedDomain)) {
+      return { isValid: false, error: '域名格式不正确' }
+    }
+    
+    return { isValid: true, normalizedDomain: trimmedDomain }
+  }
+}
+
 // 获取页面标题
 export async function fetchPageTitle(url: string): Promise<string | null> {
   try {
@@ -67,6 +119,18 @@ export function formatTimeAgo(date: Date): string {
   return date.toLocaleDateString('zh-CN')
 }
 
+// 检查域名规则是否匹配
+function isDomainMatched(targetDomain: string, ruleDomain: string): boolean {
+  // 如果规则以 *. 开头，匹配所有子域名（包括主域名）
+  if (ruleDomain.startsWith('*.')) {
+    const baseDomain = ruleDomain.substring(2) // 移除 *.
+    return targetDomain === baseDomain || targetDomain.endsWith('.' + baseDomain)
+  }
+  
+  // 精确匹配：只匹配指定的域名，不包括子域名
+  return targetDomain === ruleDomain
+}
+
 // 检查域名是否被允许访问（服务端使用）
 export async function checkDomainAccessServer(
   domain: string, 
@@ -81,20 +145,50 @@ export async function checkDomainAccessServer(
       return { allowed: false, reason: '无效域名' }
     }
     
-    // 查找匹配的域名规则
-    const matchedRule = domainRules.find(rule => 
-      domain === rule.domain || domain.endsWith('.' + rule.domain)
+    // 查找所有匹配的域名规则
+    const matchedRules = domainRules.filter(rule => 
+      isDomainMatched(domain, rule.domain)
     )
+    
+    if (matchedRules.length === 0) {
+      // 没有匹配的规则
+      if (securityMode === 'whitelist') {
+        return { allowed: false, reason: '域名不在白名单中' }
+      } else {
+        return { allowed: true }
+      }
+    }
+    
+    // 按权重排序匹配的规则：通配符规则权重最高，但在同类型中更具体的优先
+    const sortedRules = matchedRules.sort((a, b) => {
+      const aIsWildcard = a.domain.startsWith('*.')
+      const bIsWildcard = b.domain.startsWith('*.')
+      
+      // 通配符规则优先级最高
+      if (aIsWildcard && !bIsWildcard) return -1
+      if (!aIsWildcard && bIsWildcard) return 1
+      
+      // 如果都是通配符规则，更具体的（更长的）优先
+      if (aIsWildcard && bIsWildcard) {
+        return b.domain.length - a.domain.length
+      }
+      
+      // 如果都是精确匹配规则，更具体的（更长的）优先
+      return b.domain.length - a.domain.length
+    })
+    
+    // 使用权重最高的规则
+    const highestPriorityRule = sortedRules[0]
     
     if (securityMode === 'whitelist') {
       // 白名单模式：只允许白名单内的域名
-      if (matchedRule && matchedRule.type === 'whitelist') {
+      if (highestPriorityRule.type === 'whitelist') {
         return { allowed: true }
       }
       return { allowed: false, reason: '域名不在白名单中' }
     } else {
       // 黑名单模式：拦截黑名单内的域名
-      if (matchedRule && matchedRule.type === 'blacklist') {
+      if (highestPriorityRule.type === 'blacklist') {
         return { allowed: false, reason: '域名在黑名单中' }
       }
       return { allowed: true }

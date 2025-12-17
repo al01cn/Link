@@ -7,8 +7,9 @@ import SafeRedirectView from '@/components/SafeRedirectView'
 import SettingsView from '@/components/SettingsView'
 import AdminLoginPage from '@/components/AdminLoginPage'
 import { AdminProvider, useAdmin } from '@/lib/AdminContext'
-import { useTranslation, type Language } from '@/lib/translations'
+import { LanguageProvider, useLanguage } from '@/lib/LanguageContext'
 import { useNotificationDialog } from '@/lib/useDialog'
+import { requestCache } from '@/lib/requestCache'
 import NotificationDialog from '@/components/NotificationDialog'
 
 interface ShortLink {
@@ -26,30 +27,37 @@ interface ShortLink {
 
 function HomeContent() {
   const { isAuthenticated } = useAdmin()
+  const { language, setLanguage, t } = useLanguage()
   const [currentView, setCurrentView] = useState('home')
   const [redirectTarget, setRedirectTarget] = useState<ShortLink | null>(null)
-  const [lang, setLang] = useState<Language>('zh')
   const [settings, setSettings] = useState({
-    mode: 'whitelist' as 'whitelist' | 'blacklist',
-    waitTime: 5,
+    mode: 'blacklist' as 'whitelist' | 'blacklist',
+    waitTime: 3,
     captchaEnabled: false
   })
-
-  const t = useTranslation(lang)
+  const [isProcessing, setIsProcessing] = useState(false)
   
   // 通知对话框 hook
   const notificationDialog = useNotificationDialog()
 
   // 加载系统设置
   useEffect(() => {
+    let isMounted = true // 防止组件卸载后设置状态
+    
     const loadSettings = async () => {
       try {
-        const response = await fetch('/api/settings')
-        if (response.ok) {
-          const data = await response.json()
+        const data = await requestCache.get('settings', async () => {
+          const response = await fetch('/api/settings')
+          if (response.ok) {
+            return response.json()
+          }
+          throw new Error('加载设置失败')
+        })
+        
+        if (isMounted) {
           setSettings({
-            mode: data.securityMode || 'whitelist',
-            waitTime: data.waitTime || 5,
+            mode: data.securityMode || 'blacklist',
+            waitTime: data.waitTime || 3,
             captchaEnabled: data.captchaEnabled || false
           })
         }
@@ -61,13 +69,17 @@ function HomeContent() {
     if (isAuthenticated) {
       loadSettings()
     }
+
+    return () => {
+      isMounted = false
+    }
   }, [isAuthenticated])
   
   // 如果未认证，显示登录页面
   if (!isAuthenticated) {
     return <AdminLoginPage />
   }
-  const toggleLang = () => setLang(prev => prev === 'zh' ? 'en' : 'zh')
+  const toggleLang = () => setLanguage(language === 'zh' ? 'en' : 'zh')
 
   // 模拟访问短链
   const handleSimulateVisit = (link: ShortLink) => {
@@ -87,6 +99,11 @@ function HomeContent() {
   // 处理跳转确认
   const handleProceed = async (password?: string, captchaToken?: string) => {
     if (!redirectTarget) return
+
+    // 防止重复处理
+    if (isProcessing) return
+    
+    setIsProcessing(true)
 
     try {
       // 如果启用了人机验证，先验证 captcha token
@@ -109,6 +126,7 @@ function HomeContent() {
         }
       }
 
+      // 验证密码（如果需要）
       const response = await fetch(`/api/visit/${redirectTarget.path}`, {
         method: 'POST',
         headers: {
@@ -119,6 +137,20 @@ function HomeContent() {
 
       if (response.ok) {
         const data = await response.json()
+        
+        // 在跳转前记录访问统计
+        try {
+          await fetch(`/api/track-visit/${redirectTarget.path}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          })
+        } catch (trackError) {
+          console.error('记录访问统计失败:', trackError)
+          // 统计失败不影响跳转
+        }
+        
         // 在当前标签页跳转到目标URL
         window.location.href = data.originalUrl
       } else {
@@ -134,6 +166,8 @@ function HomeContent() {
         type: 'error',
         message: t('accessFailed')
       })
+    } finally {
+      setIsProcessing(false)
     }
   }
 
@@ -147,7 +181,7 @@ function HomeContent() {
       <Navbar 
         onViewChange={setCurrentView} 
         currentView={currentView} 
-        lang={lang}
+        lang={language}
         toggleLang={toggleLang}
         t={t}
       />
@@ -201,8 +235,10 @@ function HomeContent() {
 
 export default function Home() {
   return (
-    <AdminProvider>
-      <HomeContent />
-    </AdminProvider>
+    <LanguageProvider>
+      <AdminProvider>
+        <HomeContent />
+      </AdminProvider>
+    </LanguageProvider>
   )
 }

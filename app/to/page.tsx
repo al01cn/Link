@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { AlertTriangle, ExternalLink, Clock, ArrowRight, Shield, Zap, AlertCircle } from 'lucide-react'
 import { isValidUrl } from '@/lib/utils'
-import { useTranslation } from '@/lib/translations'
+import { useLanguage, LanguageProvider } from '@/lib/LanguageContext'
 import TurnstileWidget from '@/components/TurnstileWidget'
 
 // 跳转类型枚举
@@ -30,11 +30,11 @@ interface ToApiResponse {
 }
 
 function ToPageContent() {
-  const t = useTranslation('zh') // 默认中文，实际项目中可以从context获取
+  const { t } = useLanguage()
   const searchParams = useSearchParams()
   const [targetUrl, setTargetUrl] = useState('')
   const [title, setTitle] = useState('')
-  const [message, setMessage] = useState('正在前往目标链接...')
+  const [message, setMessage] = useState('')
   const [countdown, setCountdown] = useState(5)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
@@ -48,7 +48,8 @@ function ToPageContent() {
   // 客户端水合完成后启用动画
   useEffect(() => {
     setIsClient(true)
-  }, [])
+    setMessage(t('redirectingToTarget'))
+  }, [t])
 
   useEffect(() => {
     const token = searchParams.get('token')
@@ -57,7 +58,7 @@ function ToPageContent() {
     
     // 没有任何参数
     if (!token && !url) {
-      setError('缺少目标URL参数或token参数')
+      setError(t('missingTargetUrlOrToken'))
       setIsLoading(false)
       return
     }
@@ -117,22 +118,27 @@ function ToPageContent() {
         setIsLoading(false)
       } else {
         const errorData = await response.json()
-        setError(errorData.error || '获取链接配置失败')
+        setError(errorData.error || t('fetchLinkConfigFailed'))
         setIsLoading(false)
       }
     } catch (error) {
-      console.error('获取链接配置失败:', error)
-      setError('网络错误，请重试')
+      console.error(t('fetchLinkConfigFailed') + ':', error)
+      setError(t('networkError'))
       setIsLoading(false)
     }
   }
 
   const handleProceed = async () => {
+    // 防止重复处理
+    if (isLoading) return
+    
     // 如果启用了人机验证但未验证，阻止跳转
     if (captchaEnabled && !captchaVerified) {
-      setCaptchaError('请完成人机验证')
+      setCaptchaError(t('captchaRequired'))
       return
     }
+    
+    setIsLoading(true)
 
     // 如果启用了人机验证，先验证 token
     if (captchaEnabled && captchaToken) {
@@ -147,17 +153,36 @@ function ToPageContent() {
 
         if (!response.ok) {
           const errorData = await response.json()
-          setCaptchaError(errorData.error || '人机验证失败，请重试')
+          setCaptchaError(errorData.error || t('captchaFailed'))
           return
         }
       } catch (error) {
-        console.error('人机验证失败:', error)
-        setCaptchaError('验证服务异常，请重试')
+        console.error(t('captchaFailed') + ':', error)
+        setCaptchaError(t('captchaServiceError'))
         return
       }
     }
 
     if (targetUrl) {
+      // 在跳转前记录TO模式访问统计
+      try {
+        await fetch('/api/track-to-visit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            targetUrl,
+            title,
+            type: redirectType,
+            source: searchParams.get('token') ? 'token' : 'url'
+          })
+        })
+      } catch (error) {
+        console.error(t('trackToVisitFailed') + ':', error)
+        // 统计失败不影响跳转
+      }
+      
       window.location.href = targetUrl
     }
   }
@@ -180,14 +205,14 @@ function ToPageContent() {
   // 处理人机验证失败
   const handleCaptchaError = () => {
     setCaptchaToken('')
-    setCaptchaError('人机验证失败，请重试')
+    setCaptchaError(t('captchaFailed'))
     setCaptchaVerified(false)
   }
 
   // 处理人机验证过期
   const handleCaptchaExpire = () => {
     setCaptchaToken('')
-    setCaptchaError('人机验证已过期，请重新验证')
+    setCaptchaError(t('captchaExpired'))
     setCaptchaVerified(false)
   }
 
@@ -199,7 +224,7 @@ function ToPageContent() {
     try {
       return new URL(targetUrl).hostname
     } catch {
-      return '外部链接'
+      return t('externalLink')
     }
   }
 
@@ -215,14 +240,14 @@ function ToPageContent() {
       case 'confirm':
         return { 
           icon: Shield, 
-          color: 'text-[var(--color-success)]',
+          color: 'text-green-600',
           bgColor: 'bg-green-100'
         }
       case 'auto':
       default:
         return { 
           icon: Zap, 
-          color: 'text-[var(--color-primary)]',
+          color: 'text-blue-600',
           bgColor: 'bg-blue-100'
         }
     }
@@ -233,7 +258,7 @@ function ToPageContent() {
       <div className="min-h-screen bg-[--color-bg-surface] preview-grid flex items-center justify-center">
         <div className="cute-card max-w-md w-full p-8 text-center">
           <div className="w-8 h-8 border-2 border-[--color-primary]/30 border-t-[--color-primary] rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-500">正在获取链接信息...</p>
+          <p className="text-slate-500">{t('loadingInfo')}</p>
         </div>
       </div>
     )
@@ -246,13 +271,13 @@ function ToPageContent() {
           <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
             <AlertTriangle size={32} />
           </div>
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">访问错误</h2>
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">{t('accessError')}</h2>
           <p className="text-slate-500 mb-6">{error}</p>
           <button 
             onClick={handleCancel}
             className="px-6 py-3 rounded-xl font-medium text-slate-600 hover:bg-slate-100 transition-colors"
           >
-            返回
+            {t('back')}
           </button>
         </div>
       </div>
@@ -263,19 +288,11 @@ function ToPageContent() {
     <div className="min-h-screen bg-[--color-bg-surface] preview-grid">
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className={`cute-card max-w-md w-full p-8 text-center ${isClient ? 'animate-fade-in' : ''}`}>
-          <div className={`w-16 h-16 ${getIconAndColor().bgColor} ${getIconAndColor().color} rounded-full flex items-center justify-center mx-auto mb-6 relative`}>
+          <div className={`w-16 h-16 ${getIconAndColor().bgColor} ${getIconAndColor().color} rounded-full flex items-center justify-center mx-auto mb-6`}>
             {(() => {
               const IconComponent = getIconAndColor().icon
               return <IconComponent size={32} />
             })()}
-            {countdown > 0 && redirectType === 'auto' && (
-              <div 
-                className="absolute -top-2 -right-2 bg-blue-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center border-2 border-white"
-                style={{ backgroundColor: 'var(--color-primary)' }}
-              >
-                {countdown}
-              </div>
-            )}
           </div>
           
           <h2 className="text-2xl font-bold text-slate-800 mb-2">
@@ -289,7 +306,7 @@ function ToPageContent() {
             <div className="absolute top-0 right-0 p-2 opacity-50 group-hover:opacity-100 transition-opacity">
               <ExternalLink size={16} className="text-slate-400" />
             </div>
-            <div className="text-xs text-slate-400 uppercase font-bold mb-1">目标链接</div>
+            <div className="text-xs text-slate-400 uppercase font-bold mb-1">{t('targetUrl')}</div>
             <div className="text-[--color-primary] truncate font-medium">{targetUrl}</div>
             {title && (
               <div className="text-sm text-slate-600 mt-2 flex items-center gap-2">
@@ -321,7 +338,7 @@ function ToPageContent() {
           {countdown > 0 && redirectType === 'auto' && (!captchaEnabled || captchaVerified) && (
             <div className={`mb-4 text-sm text-slate-400 font-medium ${isClient ? 'animate-fade-in' : ''}`}>
               <Clock size={14} className="inline mr-1 relative -top-px" />
-              将在 {countdown} 秒后自动跳转...
+              {t('redirectingIn', { s: countdown })}
             </div>
           )}
 
@@ -332,7 +349,7 @@ function ToPageContent() {
                 onClick={handleCancel}
                 className="flex-1 px-4 py-3 rounded-xl font-medium text-slate-600 hover:bg-slate-100 transition-colors text-sm"
               >
-                取消访问
+                {t('cancelVisit')}
               </button>
               <button 
                 onClick={handleProceed}
@@ -343,7 +360,7 @@ function ToPageContent() {
                     : 'bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)]'
                 }`}
               >
-                {redirectType === 'href' ? '直接跳转' : '确认跳转'} <ArrowRight size={16} />
+                {redirectType === 'href' ? t('directRedirect') : t('confirmRedirect')} <ArrowRight size={16} />
               </button>
             </div>
           )}
@@ -355,15 +372,17 @@ function ToPageContent() {
 
 export default function ToPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-[--color-bg-surface] preview-grid flex items-center justify-center">
-        <div className="cute-card max-w-md w-full p-8 text-center">
-          <div className="w-8 h-8 border-2 border-[--color-primary]/30 border-t-[--color-primary] rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-500">正在加载...</p>
+    <LanguageProvider>
+      <Suspense fallback={
+        <div className="min-h-screen bg-[--color-bg-surface] preview-grid flex items-center justify-center">
+          <div className="cute-card max-w-md w-full p-8 text-center">
+            <div className="w-8 h-8 border-2 border-[--color-primary]/30 border-t-[--color-primary] rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-slate-500">加载中...</p>
+          </div>
         </div>
-      </div>
-    }>
-      <ToPageContent />
-    </Suspense>
+      }>
+        <ToPageContent />
+      </Suspense>
+    </LanguageProvider>
   )
 }

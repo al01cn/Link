@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { X, AlertTriangle, Info, CheckCircle } from 'lucide-react'
+import { useLanguage } from '@/lib/LanguageContext'
 
 interface ConfirmDialogProps {
   isOpen: boolean
@@ -20,10 +21,11 @@ export default function ConfirmDialog({
   onConfirm,
   title,
   message,
-  confirmText = '确认',
-  cancelText = '取消',
+  confirmText,
+  cancelText,
   type = 'warning'
 }: ConfirmDialogProps) {
+  const { t } = useLanguage()
   const [isVisible, setIsVisible] = useState(false)
 
   useEffect(() => {
@@ -110,7 +112,7 @@ export default function ConfirmDialog({
           <div className="p-6">
             <div className="flex items-start space-x-4">
               {/* 图标 */}
-              <div className="flex-shrink-0">
+              <div className="shrink-0">
                 {getIcon()}
               </div>
               
@@ -133,13 +135,13 @@ export default function ConfirmDialog({
                 onClick={handleClose}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
               >
-                {cancelText}
+                {cancelText || t('cancel')}
               </button>
               <button
                 onClick={handleConfirm}
                 className={`px-4 py-2 text-sm font-medium text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors ${getButtonColor()}`}
               >
-                {confirmText}
+                {confirmText || t('confirm')}
               </button>
             </div>
           </div>

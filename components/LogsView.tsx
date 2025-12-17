@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useLanguage } from '@/lib/LanguageContext'
 import { 
   Activity, 
   Eye, 
@@ -28,7 +29,7 @@ import NotificationDialog from './NotificationDialog'
 /**
  * 日志类型枚举
  */
-type LogType = 'visit' | 'create' | 'error'
+type LogType = 'visit' | 'create' | 'error' | 'prepare'
 
 /**
  * 日志条目接口
@@ -71,6 +72,7 @@ interface LogsViewProps {
  * @description 显示系统日志，包括访问日志、短链生成日志和错误日志
  */
 export default function LogsView({ isOpen, onClose }: LogsViewProps) {
+  const { t, language } = useLanguage()
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [stats, setStats] = useState<LogStats | null>(null)
   const [loading, setLoading] = useState(false)
@@ -151,7 +153,7 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
           color: 'text-blue-600',
           bgColor: 'bg-blue-100',
           borderColor: 'border-blue-200',
-          label: '访问'
+          label: t('visitLogs')
         }
       case 'create':
         return {
@@ -159,7 +161,7 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
           color: 'text-green-600',
           bgColor: 'bg-green-100',
           borderColor: 'border-green-200',
-          label: '创建'
+          label: t('createLogs')
         }
       case 'error':
         return {
@@ -167,7 +169,15 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
           color: 'text-red-600',
           bgColor: 'bg-red-100',
           borderColor: 'border-red-200',
-          label: '错误'
+          label: t('errorLogs')
+        }
+      case 'prepare':
+        return {
+          icon: Clock,
+          color: 'text-orange-600',
+          bgColor: 'bg-orange-100',
+          borderColor: 'border-orange-200',
+          label: t('prepareLogs')
         }
       default:
         return {
@@ -175,13 +185,16 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
           color: 'text-gray-600',
           bgColor: 'bg-gray-100',
           borderColor: 'border-gray-200',
-          label: '其他'
+          label: t('allLogs')
         }
     }
   }
 
   // 清理旧日志
   const cleanupLogs = async (days: number = 30) => {
+    // 防止重复清理
+    if (isCleaningLogs) return
+    
     setIsCleaningLogs(true)
     try {
       const response = await fetch(`/api/logs/cleanup?days=${days}`, {
@@ -192,7 +205,7 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
         const result = await response.json()
         notificationDialog.notify({
           type: 'success',
-          message: `成功清理了 ${result.deletedCount} 条日志记录`
+          message: t('cleanupSuccess', { count: result.deletedCount })
         })
         // 重新加载数据
         fetchLogs()
@@ -200,14 +213,14 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
       } else {
         notificationDialog.notify({
           type: 'error',
-          message: '清理日志失败'
+          message: t('cleanupFailed')
         })
       }
     } catch (error) {
       console.error('清理日志失败:', error)
       notificationDialog.notify({
         type: 'error',
-        message: '清理日志失败'
+        message: t('cleanupFailed')
       })
     } finally {
       setIsCleaningLogs(false)
@@ -239,8 +252,8 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
               <Activity size={18} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">系统日志</h2>
-              <p className="text-sm text-gray-600">访问记录和系统活动日志</p>
+              <h2 className="text-xl font-bold text-gray-900">{t('systemLogsTitle')}</h2>
+              <p className="text-sm text-gray-600">{t('systemLogsDesc')}</p>
             </div>
           </div>
           <button
@@ -261,7 +274,7 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                 : 'border-transparent text-gray-600 hover:text-gray-900'
             }`}
           >
-            日志记录
+            {t('logRecords')}
           </button>
           <button
             onClick={() => setActiveTab('stats')}
@@ -271,7 +284,7 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                 : 'border-transparent text-gray-600 hover:text-gray-900'
             }`}
           >
-            统计分析
+            {t('statisticsAnalysis')}
           </button>
         </div>
 
@@ -287,7 +300,7 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                     <input
                       type="text"
-                      placeholder="搜索日志消息、IP地址或用户代理..."
+                      placeholder={t('searchLogsPlaceholder')}
                       className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
@@ -312,7 +325,7 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}
                     >
-                      全部
+                      {t('allLogs')}
                     </button>
                     <button
                       onClick={() => setFilterType('visit')}
@@ -323,7 +336,7 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                       }`}
                     >
                       <Eye size={14} />
-                      访问
+                      {t('visitLogs')}
                     </button>
                     <button
                       onClick={() => setFilterType('create')}
@@ -334,7 +347,7 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                       }`}
                     >
                       <Plus size={14} />
-                      创建
+                      {t('createLogs')}
                     </button>
                     <button
                       onClick={() => setFilterType('error')}
@@ -345,7 +358,7 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                       }`}
                     >
                       <AlertTriangle size={14} />
-                      错误
+                      {t('errorLogs')}
                     </button>
                   </div>
 
@@ -357,18 +370,18 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                         fetchStats()
                       }}
                       className="px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      title="刷新日志"
+                      title={t('refreshLogsTitle')}
                     >
                       <RefreshCw size={14} />
-                      刷新
+                      {t('refreshLogs')}
                     </button>
                     <button
                       onClick={async () => {
                         const confirmed = await confirmDialog.confirm({
                           type: 'danger',
-                          title: '确认清理日志',
-                          message: '确定要清理30天前的日志吗？此操作不可恢复。',
-                          confirmText: '确定清理',
+                          title: t('confirmCleanupTitle'),
+                          message: t('confirmCleanupMessage'),
+                          confirmText: t('confirmCleanup'),
                           cancelText: '取消'
                         })
                         
@@ -378,14 +391,14 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                       }}
                       disabled={isCleaningLogs}
                       className="px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="清理30天前的日志"
+                      title={t('cleanupLogsTitle')}
                     >
                       {isCleaningLogs ? (
                         <div className="w-4 h-4 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
                       ) : (
                         <Trash2 size={14} />
                       )}
-                      清理
+                      {t('cleanup')}
                     </button>
                   </div>
                 </div>
@@ -393,9 +406,9 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                 {/* 搜索结果统计 */}
                 {(searchQuery || filterType !== 'all') && (
                   <div className="mt-3 text-sm text-gray-500">
-                    找到 {filteredLogs.length} 条记录
-                    {searchQuery && ` (搜索: "${searchQuery}")`}
-                    {filterType !== 'all' && ` (类型: ${getLogTypeInfo(filterType as LogType).label})`}
+                    {t('foundRecords', { count: filteredLogs.length })}
+                    {searchQuery && ` (${t('searchLabel')}: "${searchQuery}")`}
+                    {filterType !== 'all' && ` (${t('typeLabel')}: ${getLogTypeInfo(filterType as LogType).label})`}
                   </div>
                 )}
               </div>
@@ -409,8 +422,8 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                 ) : filteredLogs.length === 0 ? (
                   <div className="text-center py-12 text-gray-400">
                     <Activity size={48} className="mx-auto mb-4 opacity-50" />
-                    <p>暂无日志记录</p>
-                    <p className="text-sm">系统活动将在这里显示</p>
+                    <p>{t('noLogsRecord')}</p>
+                    <p className="text-sm">{t('systemActivityWillShow')}</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -462,9 +475,9 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                             <div className="p-4 bg-gray-50 border-t border-gray-200">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                 <div>
-                                  <span className="font-medium text-gray-700">时间:</span>
+                                  <span className="font-medium text-gray-700">{t('time')}:</span>
                                   <span className="ml-2 text-gray-600">
-                                    {new Date(log.createdAt).toLocaleString('zh-CN')}
+                                    {new Date(log.createdAt).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US')}
                                   </span>
                                 </div>
                                 {log.ip && (
@@ -510,7 +523,7 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                           <Eye size={20} />
                         </div>
                         <div>
-                          <p className="text-sm text-blue-600 font-medium">访问日志</p>
+                          <p className="text-sm text-blue-600 font-medium">{t('visitLogsCount')}</p>
                           <p className="text-2xl font-bold text-blue-800">{stats.visitCount}</p>
                         </div>
                       </div>
@@ -522,7 +535,7 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                           <Plus size={20} />
                         </div>
                         <div>
-                          <p className="text-sm text-green-600 font-medium">创建日志</p>
+                          <p className="text-sm text-green-600 font-medium">{t('createLogs')}</p>
                           <p className="text-2xl font-bold text-green-800">{stats.createCount}</p>
                         </div>
                       </div>
@@ -534,7 +547,7 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                           <AlertTriangle size={20} />
                         </div>
                         <div>
-                          <p className="text-sm text-red-600 font-medium">错误日志</p>
+                          <p className="text-sm text-red-600 font-medium">{t('errorLogsCount')}</p>
                           <p className="text-2xl font-bold text-red-800">{stats.errorCount}</p>
                         </div>
                       </div>
@@ -546,7 +559,7 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                           <TrendingUp size={20} />
                         </div>
                         <div>
-                          <p className="text-sm text-purple-600 font-medium">今日活动</p>
+                          <p className="text-sm text-purple-600 font-medium">{t('todayActivity')}</p>
                           <p className="text-2xl font-bold text-purple-800">{stats.todayCount}</p>
                         </div>
                       </div>
@@ -557,7 +570,7 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                   <div className="bg-white border border-gray-200 rounded-lg p-6">
                     <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                       <BarChart3 size={20} />
-                      过去24小时活动
+                      {t('past24HoursActivity')}
                     </h3>
                     <div className="h-64 flex items-end justify-between gap-1">
                       {stats.last24Hours.map((item, index) => {
@@ -570,7 +583,7 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                             <div
                               className="w-full bg-purple-500 rounded-t transition-all hover:bg-purple-600"
                               style={{ height: `${height}%`, minHeight: item.count > 0 ? '4px' : '0' }}
-                              title={`${hour}:00 - ${item.count} 条记录`}
+                              title={`${hour}:00 - ${t('recordsCount', { count: item.count })}`}
                             ></div>
                             <span className="text-xs text-gray-500 mt-1">
                               {hour}
@@ -583,23 +596,23 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
 
                   {/* 总体统计 */}
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4">总体统计</h3>
+                    <h3 className="text-lg font-bold text-gray-900 mb-4">{t('overallStatistics')}</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                       <div className="text-center">
                         <p className="text-3xl font-bold text-gray-800">{stats.total}</p>
-                        <p className="text-gray-600">总日志数</p>
+                        <p className="text-gray-600">{t('totalLogsNumber')}</p>
                       </div>
                       <div className="text-center">
                         <p className="text-3xl font-bold text-gray-800">
                           {stats.total > 0 ? Math.round((stats.visitCount / stats.total) * 100) : 0}%
                         </p>
-                        <p className="text-gray-600">访问占比</p>
+                        <p className="text-gray-600">{language === 'zh' ? '访问占比' : 'Visit Rate'}</p>
                       </div>
                       <div className="text-center">
                         <p className="text-3xl font-bold text-gray-800">
                           {stats.total > 0 ? Math.round((stats.errorCount / stats.total) * 100) : 0}%
                         </p>
-                        <p className="text-gray-600">错误率</p>
+                        <p className="text-gray-600">{language === 'zh' ? '错误率' : 'Error Rate'}</p>
                       </div>
                     </div>
                   </div>

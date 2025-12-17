@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { translateForRequest } from '@/lib/translations'
+import { validateDomainRule } from '@/lib/utils'
 
 // 获取域名规则列表
 export async function GET(request: NextRequest) {
@@ -17,7 +19,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(domainRules)
   } catch (error) {
     console.error('获取域名规则失败:', error)
-    return NextResponse.json({ error: '服务器错误' }, { status: 500 })
+    return NextResponse.json({ error: translateForRequest(request, 'serverError') }, { status: 500 })
   }
 }
 
@@ -28,37 +30,39 @@ export async function POST(request: NextRequest) {
     const { domain, type } = body
     
     if (!domain || !type) {
-      return NextResponse.json({ error: '域名和类型不能为空' }, { status: 400 })
+      return NextResponse.json({ error: translateForRequest(request, 'invalidRequestParams') }, { status: 400 })
     }
     
-    // 验证域名格式
-    const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
-    if (!domainRegex.test(domain)) {
-      return NextResponse.json({ error: '无效的域名格式' }, { status: 400 })
+    // 使用新的域名验证函数
+    const validation = validateDomainRule(domain)
+    if (!validation.isValid) {
+      return NextResponse.json({ error: validation.error }, { status: 400 })
     }
+    
+    const normalizedDomain = validation.normalizedDomain!
     
     // 检查是否已存在
     const existing = await prisma.domainRule.findUnique({
-      where: { domain }
+      where: { domain: normalizedDomain }
     })
     
     if (existing) {
       // 如果存在但类型不同，更新类型
       if (existing.type !== type) {
         const updated = await prisma.domainRule.update({
-          where: { domain },
+          where: { domain: normalizedDomain },
           data: { type, active: true }
         })
         return NextResponse.json(updated)
       } else {
-        return NextResponse.json({ error: '域名已存在' }, { status: 400 })
+        return NextResponse.json({ error: '该域名规则已存在' }, { status: 400 })
       }
     }
     
     // 创建新规则
     const domainRule = await prisma.domainRule.create({
       data: {
-        domain,
+        domain: normalizedDomain,
         type,
         active: true
       }
@@ -67,6 +71,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(domainRule)
   } catch (error) {
     console.error('添加域名规则失败:', error)
-    return NextResponse.json({ error: '服务器错误' }, { status: 500 })
+    return NextResponse.json({ error: translateForRequest(request, 'serverError') }, { status: 500 })
   }
 }

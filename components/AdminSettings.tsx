@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Lock, Eye, EyeOff, AlertCircle, CheckCircle, X, User } from 'lucide-react'
 import { useAdmin } from '@/lib/AdminContext'
+import { useLanguage } from '@/lib/LanguageContext'
 // 动态导入dialog-polyfill避免SSR问题
 
 interface AdminSettingsProps {
@@ -10,6 +11,8 @@ interface AdminSettingsProps {
 }
 
 export default function AdminSettings({ onClose }: AdminSettingsProps) {
+  const { logout } = useAdmin()
+  const { t } = useLanguage()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newUsername, setNewUsername] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -22,7 +25,6 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-  const { logout } = useAdmin()
   const dialogRef = useRef<HTMLDialogElement>(null)
 
   // 初始化 dialog polyfill 并打开弹窗
@@ -70,19 +72,22 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
     e.preventDefault()
     
     if (!currentPassword.trim() || !newUsername.trim() || !newPassword.trim()) {
-      setError('请填写所有必填字段')
+      setError(t('pleaseEnterAllFields'))
       return
     }
 
     if (newPassword !== confirmPassword) {
-      setError('新密码和确认密码不匹配')
+      setError(t('passwordMismatch'))
       return
     }
 
     if (newPassword.length < 6) {
-      setError('新密码长度至少6位')
+      setError(t('newPasswordMinLength'))
       return
     }
+
+    // 防止重复提交
+    if (isLoading) return
 
     setIsLoading(true)
     setError('')
@@ -110,11 +115,11 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
           handleClose()
         }, 2000)
       } else {
-        setError(data.error || '修改失败')
+        setError(data.error || t('modifyFailed'))
       }
     } catch (error) {
       console.error('修改管理员信息错误:', error)
-      setError('网络错误，请重试')
+      setError(t('networkErrorRetry'))
     } finally {
       setIsLoading(false)
     }
@@ -132,8 +137,8 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="text-green-600" size={24} />
             </div>
-            <h2 className="text-2xl font-bold text-slate-800 mb-2">修改成功</h2>
-            <p className="text-slate-500 text-sm mb-6">管理员信息已更新，请使用新凭据重新登录</p>
+            <h2 className="text-2xl font-bold text-slate-800 mb-2">{t('modifySuccess')}</h2>
+            <p className="text-slate-500 text-sm mb-6">{t('adminInfoUpdated')}</p>
             <div className="w-8 h-8 border-2 border-green-300 border-t-green-600 rounded-full animate-spin mx-auto"></div>
           </div>
         </div>
@@ -150,7 +155,7 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate__animated animate__fadeIn">
         <div className="p-8">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-slate-800">管理员设置</h2>
+            <h2 className="text-2xl font-bold text-slate-800">{t('adminSettings')}</h2>
             <button
               onClick={handleClose}
               className="p-2 hover:bg-slate-100 rounded-full text-slate-400"
@@ -170,7 +175,7 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                当前密码 <span className="text-red-500">*</span>
+                {t('currentPassword')} <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
@@ -179,7 +184,7 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   className="w-full pl-10 pr-12 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-                  placeholder="请输入当前密码"
+                  placeholder={t('enterCurrentPassword')}
                   disabled={isLoading}
                 />
                 <button
@@ -195,7 +200,7 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                新用户名 <span className="text-red-500">*</span>
+                {t('newUsername')} <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
@@ -204,7 +209,7 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
                   value={newUsername}
                   onChange={(e) => setNewUsername(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-                  placeholder="请输入新用户名"
+                  placeholder={t('enterNewUsername')}
                   disabled={isLoading}
                 />
               </div>
@@ -212,7 +217,7 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                新密码 <span className="text-red-500">*</span>
+                {t('newPassword')} <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
@@ -221,7 +226,7 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className="w-full pl-10 pr-12 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-                  placeholder="请输入新密码（至少6位）"
+                  placeholder={t('enterNewPassword')}
                   disabled={isLoading}
                 />
                 <button
@@ -237,7 +242,7 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                确认新密码 <span className="text-red-500">*</span>
+                {t('confirmNewPassword')} <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
@@ -246,7 +251,7 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className="w-full pl-10 pr-12 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-                  placeholder="请再次输入新密码"
+                  placeholder={t('enterNewPasswordAgain')}
                   disabled={isLoading}
                 />
                 <button
@@ -267,7 +272,7 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
                 className="flex-1 py-3 px-4 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors font-medium"
                 disabled={isLoading}
               >
-                取消
+                {t('cancel')}
               </button>
               <button
                 type="submit"
@@ -277,10 +282,10 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
                 {isLoading ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    保存中...
+                    {t('saving')}
                   </>
                 ) : (
-                  '保存修改'
+                  t('saveChanges')
                 )}
               </button>
             </div>

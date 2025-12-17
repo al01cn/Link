@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Link2, ArrowRight, Settings, ChevronDown, Lock, Shield, Zap, Eye, Copy, Trash2, X, Search, Filter, Calendar, SortAsc, SortDesc, MousePointer, ExternalLink, Edit } from 'lucide-react'
+import { Link2, ArrowRight, Settings, ChevronDown, Lock, Shield, Zap, Eye, Copy, Trash2, X, Search, Filter, Calendar, SortAsc, SortDesc, MousePointer, ExternalLink, Edit, Check } from 'lucide-react'
 import { formatTimeAgo } from '@/lib/utils'
 import { TranslationKey } from '@/lib/translations'
 import { useConfirmDialog, useNotificationDialog } from '@/lib/useDialog'
+import { requestCache } from '@/lib/requestCache'
 import ConfirmDialog from './ConfirmDialog'
 import NotificationDialog from './NotificationDialog'
 import EditPanel from './EditPanel'
@@ -25,7 +26,7 @@ interface ShortLink {
 
 interface HomeViewProps {
   onSimulateVisit: (link: ShortLink) => void
-  t: (key: TranslationKey) => string
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string
 }
 
 export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
@@ -150,11 +151,37 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
 
   // 加载短链列表
   useEffect(() => {
-    fetchLinks()
+    let isMounted = true // 防止组件卸载后设置状态
+    
+    const loadLinks = async () => {
+      try {
+        const data = await requestCache.get('links', async () => {
+          const response = await fetch('/api/links')
+          if (response.ok) {
+            return response.json()
+          }
+          throw new Error('获取短链列表失败')
+        })
+        
+        if (isMounted) {
+          setLinks(data)
+        }
+      } catch (error) {
+        console.error('获取短链列表失败:', error)
+      }
+    }
+
+    loadLinks()
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   const fetchLinks = async () => {
     try {
+      // 刷新时清除缓存，确保获取最新数据
+      requestCache.clear()
       const response = await fetch('/api/links')
       if (response.ok) {
         const data = await response.json()
@@ -171,36 +198,36 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
 
     // URL验证
     if (!url.trim()) {
-      errors.url = '请输入链接地址'
+      errors.url = t('pleaseEnterUrl')
     } else {
       try {
         new URL(url)
       } catch {
-        errors.url = '请输入有效的URL格式'
+        errors.url = t('pleaseEnterValidUrl')
       }
     }
 
     // 自定义路径验证
     if (customPath.trim()) {
       if (!/^[a-zA-Z0-9_-]+$/.test(customPath)) {
-        errors.customPath = '路径只能包含字母、数字、下划线和连字符'
+        errors.customPath = t('pathOnlyLettersNumbers')
       } else if (customPath.length < 3) {
-        errors.customPath = '路径长度至少3个字符'
+        errors.customPath = t('pathMinLength')
       } else if (customPath.length > 50) {
-        errors.customPath = '路径长度不能超过50个字符'
+        errors.customPath = t('pathMaxLength')
       }
     }
 
     // 密码验证
     if (password.trim() && password.length < 4) {
-      errors.password = '密码长度至少4个字符'
+      errors.password = t('passwordMinLength')
     }
 
     // 过期时间验证
     if (expiresAt) {
       const expireDate = new Date(expiresAt)
       if (expireDate <= new Date()) {
-        errors.expiresAt = '过期时间必须晚于当前时间'
+        errors.expiresAt = t('expireTimeMustBeFuture')
       }
     }
 
@@ -210,6 +237,9 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
 
   const generateLink = async () => {
     if (!url || !validateCreateForm()) return
+    
+    // 防止重复提交
+    if (isGenerating) return
     
     setIsGenerating(true)
     
@@ -249,10 +279,10 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
         if (response.status === 409 && error.existingLink) {
           const confirmed = await confirmDialog.confirm({
             type: 'warning',
-            title: '链接已存在',
-            message: `该链接已存在短链：${error.existingLink.shortUrl}\n\n是否要复制现有短链？`,
-            confirmText: '复制链接',
-            cancelText: '取消'
+            title: t('linkExists'),
+            message: t('linkExistsMessage', { shortUrl: error.existingLink.shortUrl }),
+            confirmText: t('copyExistingLink'),
+            cancelText: t('cancel')
           })
           
           if (confirmed) {
@@ -289,13 +319,17 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
   const deleteLink = async (id: string) => {
     const confirmed = await confirmDialog.confirm({
       type: 'danger',
-      title: '确认删除',
+      title: t('confirmDeleteTitle'),
       message: t('confirmDelete'),
-      confirmText: '删除',
-      cancelText: '取消'
+      confirmText: t('delete'),
+      cancelText: t('cancel')
     })
     
     if (!confirmed) return
+    
+    // 防止重复删除
+    const linkExists = links.find(link => link.id === id)
+    if (!linkExists) return
     
     try {
       const response = await fetch(`/api/links/${id}`, {
@@ -329,7 +363,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
   const verifyAdminAndShowPassword = async () => {
     const token = typeof window !== 'undefined' ? sessionStorage.getItem('adminToken') : null
     if (!token) {
-      setAdminError('请先登录管理员账户')
+      setAdminError(t('pleaseLoginAdminFirst'))
       return
     }
 
@@ -350,7 +384,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
         
         // 检查是否真的有密码
         if (!data.hasPassword || !data.password) {
-          setAdminError('该链接没有设置密码')
+          setAdminError(t('noPasswordSet'))
           return
         }
         
@@ -360,17 +394,17 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
       } else {
         const errorData = await response.json()
         if (response.status === 401) {
-          setAdminError('管理员权限已过期，请重新登录')
+          setAdminError(t('adminTokenExpired'))
           if (typeof window !== 'undefined') {
             sessionStorage.removeItem('adminToken')
           }
         } else {
-          setAdminError(errorData.error || '获取密码失败')
+          setAdminError(errorData.error || t('getPasswordFailed'))
         }
       }
     } catch (error) {
       console.error('获取密码失败:', error)
-      setAdminError('网络错误，请重试')
+      setAdminError(t('networkErrorRetry'))
     } finally {
       setLoadingPassword(false)
       setLoadingPasswordId(null)
@@ -417,20 +451,20 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
         setExpandedEditId(null)
         notificationDialog.notify({
           type: 'success',
-          message: '短链更新成功'
+          message: t('updateSuccess')
         })
       } else {
         const error = await response.json()
         notificationDialog.notify({
           type: 'error',
-          message: error.error || '更新失败'
+          message: error.error || t('updateFailed')
         })
       }
     } catch (error) {
       console.error('更新短链失败:', error)
       notificationDialog.notify({
         type: 'error',
-        message: '网络错误，请重试'
+        message: t('networkErrorRetry')
       })
     }
   }
@@ -618,14 +652,14 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
 
               {/* 第二行：过期时间 */}
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1 ml-1">过期时间</label>
+                <label className="block text-xs font-medium text-slate-500 mb-1 ml-1">{t('setExpirationTime')}</label>
                 <div className={`cute-input-wrapper bg-white rounded-lg px-3 py-2 flex items-center gap-2 text-sm ${
                   formErrors.expiresAt ? 'border border-red-300' : ''
                 }`}>
                   <Calendar size={14} className="text-slate-400" />
                   <input 
                     type="datetime-local" 
-                    placeholder="设置过期时间"
+                    placeholder={t('setExpirationTime')}
                     className="w-full outline-none text-slate-700"
                     value={expiresAt}
                     onChange={(e) => {
@@ -639,7 +673,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                 {formErrors.expiresAt && (
                   <p className="text-xs text-red-500 mt-1">{formErrors.expiresAt}</p>
                 )}
-                <p className="text-xs text-slate-500 mt-1">留空表示永不过期</p>
+                <p className="text-xs text-slate-500 mt-1">{t('leaveEmptyNeverExpire')}</p>
               </div>
 
               {/* 第三行：开关选项 */}
@@ -656,7 +690,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                     <div className="flex flex-col">
                       <span className="text-sm font-medium text-slate-700">{t('enableIntermediate')}</span>
                       {password.trim() && (
-                        <span className="text-xs text-slate-400">设置密码时自动禁用</span>
+                        <span className="text-xs text-slate-400">{t('autoDisabledWithPassword')}</span>
                       )}
                     </div>
                   </div>
@@ -687,7 +721,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                     <div className="flex flex-col">
                       <span className="text-sm font-medium text-slate-700">{t('enableConfirm')}</span>
                       {password.trim() && (
-                        <span className="text-xs text-orange-500">设置密码时自动启用</span>
+                        <span className="text-xs text-orange-500">{t('formAutoEnabledWithPassword')}</span>
                       )}
                     </div>
                   </div>
@@ -719,7 +753,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
               <Search className="text-slate-400" size={18} />
               <input 
                 type="text" 
-                placeholder="搜索短链、原链接或标题..."
+                placeholder={t('searchPlaceholder')}
                 className="flex-1 bg-transparent border-none outline-none text-slate-700 placeholder-slate-400"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -744,7 +778,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
               }`}
             >
               <Filter size={18} />
-              筛选
+              {t('filter')}
               {(filterType !== 'all' || sortBy !== 'newest') && (
                 <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
               )}
@@ -759,7 +793,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
               
               {/* 类型筛选 */}
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-2">链接类型</label>
+                <label className="block text-xs font-medium text-slate-500 mb-2">{t('linkType')}</label>
                 <div className="grid grid-cols-3 gap-2">
                   <button 
                     onClick={() => setFilterType('all')}
@@ -769,7 +803,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                         : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
                     }`}
                   >
-                    全部
+                    {t('allFilter')}
                   </button>
                   <button 
                     onClick={() => setFilterType('password')}
@@ -780,7 +814,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                     }`}
                   >
                     <Lock size={14} />
-                    密码
+                    {t('passwordFilter')}
                   </button>
                   <button 
                     onClick={() => setFilterType('confirm')}
@@ -791,7 +825,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                     }`}
                   >
                     <Shield size={14} />
-                    确认
+                    {t('confirmFilter')}
                   </button>
                   <button 
                     onClick={() => setFilterType('auto')}
@@ -802,7 +836,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                     }`}
                   >
                     <Zap size={14} />
-                    自动跳转
+                    {t('autoRedirectType')}
                   </button>
                   <button 
                     onClick={() => setFilterType('direct')}
@@ -813,14 +847,14 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                     }`}
                   >
                     <ExternalLink size={14} />
-                    直接跳转
+                    {t('directRedirectType')}
                   </button>
                 </div>
               </div>
 
               {/* 排序选项 */}
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-2">排序方式</label>
+                <label className="block text-xs font-medium text-slate-500 mb-2">{t('sortBy')}</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button 
                     onClick={() => setSortBy('newest')}
@@ -831,7 +865,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                     }`}
                   >
                     <Calendar size={14} />
-                    最新
+                    {t('newest')}
                   </button>
                   <button 
                     onClick={() => setSortBy('oldest')}
@@ -842,7 +876,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                     }`}
                   >
                     <Calendar size={14} />
-                    最早
+                    {t('oldest')}
                   </button>
                   <button 
                     onClick={() => setSortBy('views')}
@@ -853,7 +887,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                     }`}
                   >
                     <Eye size={14} />
-                    访问量
+                    {t('viewsSort')}
                   </button>
                   <button 
                     onClick={() => setSortBy('title')}
@@ -864,7 +898,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                     }`}
                   >
                     <SortAsc size={14} />
-                    标题
+                    {t('titleSort')}
                   </button>
                 </div>
               </div>
@@ -877,7 +911,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                   onClick={clearSearch}
                   className="px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
                 >
-                  清空筛选
+                  {t('clearFilter')}
                 </button>
               </div>
             )}
@@ -886,13 +920,13 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
           {/* 搜索结果统计 */}
           {(searchQuery || filterType !== 'all') && (
             <div className="mt-3 pt-3 border-t border-slate-100 text-sm text-slate-500">
-              找到 {filteredAndSortedLinks.length} 个结果
-              {searchQuery && ` (搜索: "${searchQuery}")`}
-              {filterType !== 'all' && ` (类型: ${
-                filterType === 'password' ? '密码保护' :
-                filterType === 'confirm' ? '二次确认' :
-                filterType === 'auto' ? '自动跳转' :
-                filterType === 'direct' ? '直接跳转' : ''
+              {t('foundResults', { count: filteredAndSortedLinks.length })}
+              {searchQuery && ` (${t('searchTerm')}: "${searchQuery}")`}
+              {filterType !== 'all' && ` (${t('typeTerm')}: ${
+                filterType === 'password' ? t('passwordProtectedType') :
+                filterType === 'confirm' ? t('confirmType') :
+                filterType === 'auto' ? t('autoRedirectType') :
+                filterType === 'direct' ? t('directRedirectType') : ''
               })`}
             </div>
           )}
@@ -953,7 +987,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                   {link.hasPassword && (
                     <button 
                       className="p-2 hover:bg-orange-50 rounded-lg text-slate-500 hover:text-orange-600 transition-colors active:scale-95"
-                      title="查看密码"
+                      title={t('viewPassword')}
                       onClick={() => showPassword(link.id)}
                       disabled={loadingPasswordId === link.id}
                     >
@@ -970,7 +1004,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                         ? 'bg-blue-100 text-blue-600' 
                         : 'hover:bg-blue-50 text-slate-500 hover:text-blue-600'
                     }`}
-                    title="编辑"
+                    title={t('edit')}
                     onClick={() => toggleEditExpand(link)}
                   >
                     <Edit size={18} />
@@ -980,7 +1014,11 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                     title={copySuccess === link.id.toString() ? t('copied') : t('copy')}
                     onClick={() => copyToClipboard(link.shortUrl, link.id)}
                   >
-                    <Copy size={18} />
+                    {copySuccess === link.id.toString() ? (
+                      <Check size={18} className="text-green-500" />
+                    ) : (
+                      <Copy size={18} />
+                    )}
                   </button>
                   <button 
                     className="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-[var(--color-error)] transition-colors active:scale-95"
@@ -1016,13 +1054,13 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
         {links.length > 0 && filteredAndSortedLinks.length === 0 && (
           <div className="text-center py-12 text-slate-400">
             <Search size={48} className="mx-auto mb-4 opacity-50" />
-            <p>没有找到匹配的短链</p>
-            <p className="text-sm">尝试调整搜索条件或筛选选项</p>
+            <p>{t('noMatchingLinks')}</p>
+            <p className="text-sm">{t('adjustSearchCriteria')}</p>
             <button 
               onClick={clearSearch}
               className="mt-4 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium"
             >
-              清空筛选
+              {t('clearFilter')}
             </button>
           </div>
         )}
@@ -1040,7 +1078,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                 <Shield size={20} className="text-blue-500" />
-                管理员验证
+                {t('adminVerification')}
               </h3>
               <button 
                 onClick={closeAdminModal}
@@ -1052,7 +1090,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
 
             {/* 说明文字 */}
             <p className="text-sm text-slate-600 mb-4">
-              查看密码需要管理员权限，请确认您已登录管理员账户：
+              {t('viewPasswordRequiresAdmin')}
             </p>
 
             {/* 登录状态检查 */}
@@ -1063,10 +1101,10 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                 <Shield size={20} className={isAdminLoggedIn ? 'text-green-500' : 'text-slate-400'} />
                 <div className="flex-1">
                   <p className="text-sm font-medium text-slate-700">
-                    {isAdminLoggedIn ? '管理员已登录' : '需要管理员登录'}
+                    {isAdminLoggedIn ? t('adminLoggedIn') : t('needAdminLogin')}
                   </p>
                   <p className="text-xs text-slate-500">
-                    {isAdminLoggedIn ? '点击下方按钮查看密码' : '请先在设置页面登录管理员账户'}
+                    {isAdminLoggedIn ? t('clickToViewPassword') : t('pleaseLoginAdminFirst')}
                   </p>
                 </div>
               </div>
@@ -1085,7 +1123,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                 className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors"
                 disabled={loadingPassword}
               >
-                取消
+                {t('cancel')}
               </button>
               <button 
                 onClick={verifyAdminAndShowPassword}
@@ -1097,12 +1135,12 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                 {loadingPassword ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    获取中...
+                    {t('getting')}
                   </>
                 ) : (
                   <>
                     <Shield size={16} />
-                    查看密码
+                    {t('viewPasswordButton')}
                   </>
                 )}
               </button>
@@ -1123,7 +1161,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                 <Lock size={20} className="text-orange-500" />
-                链接密码
+                {t('linkPassword')}
               </h3>
               <button 
                 onClick={closePasswordModal}
@@ -1136,7 +1174,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
             {/* 密码显示区域 */}
             <div className="mb-6">
               <label className="block text-sm font-medium text-slate-600 mb-2">
-                访问密码
+                {t('accessPasswordLabel')}
               </label>
               <div className="cute-input-wrapper bg-slate-50 rounded-lg px-4 py-3 flex items-center gap-3">
                 <Lock size={16} className="text-slate-400" />
@@ -1145,21 +1183,25 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                   value={currentPassword}
                   readOnly
                   className="flex-1 bg-transparent border-none outline-none text-slate-800 font-mono"
-                  placeholder={currentPassword ? "" : "密码获取中..."}
+                  placeholder={currentPassword ? "" : t('gettingPassword')}
                 />
                 {currentPassword && (
                   <button 
                     onClick={() => copyToClipboard(currentPassword, 'password')}
                     className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-[var(--color-primary)] transition-colors"
-                    title="复制密码"
+                    title={copySuccess === 'password' ? t('copied') : t('copy')}
                   >
-                    <Copy size={16} />
+                    {copySuccess === 'password' ? (
+                      <Check size={16} className="text-green-500" />
+                    ) : (
+                      <Copy size={16} />
+                    )}
                   </button>
                 )}
               </div>
               {currentPassword && (
                 <p className="text-xs text-slate-500 mt-2">
-                  密码长度：{currentPassword.length} 个字符
+                  {t('passwordLength', { length: currentPassword.length })}
                 </p>
               )}
             </div>
@@ -1170,7 +1212,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                 onClick={closePasswordModal}
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors"
               >
-                关闭
+                {t('close')}
               </button>
             </div>
           </div>

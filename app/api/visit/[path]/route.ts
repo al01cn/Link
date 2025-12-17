@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyPassword } from '@/lib/crypto'
 import { logVisit, logError } from '@/lib/logger'
+import { useTranslation } from '@/lib/translations'
 
 // 访问短链 - 获取链接信息
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path: string }> }
 ) {
+  // 获取语言偏好
+  const acceptLanguage = request.headers.get('accept-language') || 'zh'
+  const language = acceptLanguage.includes('en') ? 'en' : 'zh'
+  const t = useTranslation(language)
+  
   try {
     const { path } = await params
     
@@ -17,12 +23,12 @@ export async function GET(
     })
 
     if (!shortLink) {
-      return NextResponse.json({ error: '短链不存在' }, { status: 404 })
+      return NextResponse.json({ error: t('apiLinkNotFound') }, { status: 404 })
     }
 
     // 检查是否过期
     if (shortLink.expiresAt && shortLink.expiresAt < new Date()) {
-      return NextResponse.json({ error: '短链已过期' }, { status: 410 })
+      return NextResponse.json({ error: t('apiLinkExpired') }, { status: 410 })
     }
 
     // 返回链接信息（不包含密码）
@@ -36,8 +42,8 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('获取短链信息失败:', error)
-    return NextResponse.json({ error: '服务器错误' }, { status: 500 })
+    console.error(t('getShortLinkInfoFailed') + ':', error)
+    return NextResponse.json({ error: t('apiServerError') }, { status: 500 })
   }
 }
 
@@ -46,6 +52,11 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ path: string }> }
 ) {
+  // 获取语言偏好
+  const acceptLanguage = request.headers.get('accept-language') || 'zh'
+  const language = acceptLanguage.includes('en') ? 'en' : 'zh'
+  const t = useTranslation(language)
+  
   try {
     const { path } = await params
     const body = await request.json()
@@ -57,49 +68,21 @@ export async function POST(
     })
 
     if (!shortLink) {
-      return NextResponse.json({ error: '短链不存在' }, { status: 404 })
+      return NextResponse.json({ error: t('apiLinkNotFound') }, { status: 404 })
     }
 
     // 检查是否过期
     if (shortLink.expiresAt && shortLink.expiresAt < new Date()) {
-      return NextResponse.json({ error: '短链已过期' }, { status: 410 })
+      return NextResponse.json({ error: t('apiLinkExpired') }, { status: 410 })
     }
 
     // 验证密码
     if (shortLink.password && !verifyPassword(password || '', shortLink.password)) {
-      return NextResponse.json({ error: '密码错误' }, { status: 401 })
+      return NextResponse.json({ error: t('apiPasswordRequired') }, { status: 401 })
     }
 
-    // 记录访问日志
-    const clientIP = request.headers.get('x-forwarded-for') || 
-                    request.headers.get('x-real-ip') || 
-                    'unknown'
-    const userAgent = request.headers.get('user-agent') || ''
-    const referer = request.headers.get('referer') || ''
-
-    await Promise.all([
-      // 增加访问次数
-      prisma.shortLink.update({
-        where: { id: shortLink.id },
-        data: { views: { increment: 1 } }
-      }),
-      // 记录访问日志
-      prisma.visitLog.create({
-        data: {
-          shortId: shortLink.id,
-          ip: clientIP,
-          userAgent,
-          referer
-        }
-      }),
-      // 记录系统日志
-      logVisit(path, shortLink.originalUrl, request, {
-        shortLinkId: shortLink.id,
-        title: shortLink.title,
-        hasPassword: !!shortLink.password,
-        referer
-      })
-    ])
+    // 验证通过，但不在这里统计访问
+    // 统计将在客户端真正跳转时进行
 
     return NextResponse.json({
       originalUrl: shortLink.originalUrl,
@@ -107,8 +90,8 @@ export async function POST(
     })
 
   } catch (error) {
-    console.error('处理短链访问失败:', error)
-    await logError('处理短链访问失败', error, request)
-    return NextResponse.json({ error: '服务器错误' }, { status: 500 })
+    console.error(t('processShortLinkAccessFailed') + ':', error)
+    await logError(t('processShortLinkAccessFailed'), error, request)
+    return NextResponse.json({ error: t('apiServerError') }, { status: 500 })
   }
 }

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { translateForRequest } from '@/lib/translations'
 
 // 获取系统设置
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // 获取安全模式设置
     const securityMode = await prisma.setting.findUnique({
@@ -26,14 +27,14 @@ export async function GET() {
     })
     
     return NextResponse.json({
-      securityMode: securityMode?.value || 'whitelist',
-      waitTime: parseInt(waitTime?.value || '5'),
+      securityMode: securityMode?.value || 'blacklist',
+      waitTime: parseInt(waitTime?.value || '3'),
       captchaEnabled: captchaEnabled?.value === 'true',
       domainRules
     })
   } catch (error) {
     console.error('获取设置失败:', error)
-    return NextResponse.json({ error: '服务器错误' }, { status: 500 })
+    return NextResponse.json({ error: translateForRequest(request, 'serverError') }, { status: 500 })
   }
 }
 
@@ -73,6 +74,6 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('更新设置失败:', error)
-    return NextResponse.json({ error: '服务器错误' }, { status: 500 })
+    return NextResponse.json({ error: translateForRequest(request, 'serverError') }, { status: 500 })
   }
 }

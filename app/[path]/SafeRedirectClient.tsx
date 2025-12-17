@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { AlertTriangle, ExternalLink, Lock, Clock, AlertCircle, ArrowRight, Shield, Zap } from 'lucide-react'
+import { useLanguage } from '@/lib/LanguageContext'
+import { requestCache } from '@/lib/requestCache'
 import TurnstileWidget from '@/components/TurnstileWidget'
 
 interface SafeRedirectClientProps {
@@ -21,6 +23,7 @@ export default function SafeRedirectClient({
   requireConfirm, 
   enableIntermediate 
 }: SafeRedirectClientProps) {
+  const { t, language } = useLanguage()
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [countdown, setCountdown] = useState(5) // 默认5秒倒计时
@@ -59,7 +62,7 @@ export default function SafeRedirectClient({
   // 获取显示标题
   const getDisplayTitle = () => {
     if (domainBlocked) {
-      return '目标被拦截'
+      return t('targetBlocked')
     }
     if (title) {
       return truncateTitle(title)
@@ -70,21 +73,21 @@ export default function SafeRedirectClient({
   // 获取描述文字
   const getDescription = () => {
     if (domainBlocked) {
-      return `${blockReason}，${blockCountdown} 秒后自动关闭...`
+      return t('blockReasonWithCountdown', { reason: blockReason, countdown: blockCountdown })
     }
     if (captchaEnabled && showCaptcha && !captchaVerified) {
-      return '请完成人机验证后继续...'
+      return t('completeCaptchaToContinue')
     }
     if (hasPassword) {
-      return '确认密码后，将前往目标链接...'
+      return t('confirmPasswordToRedirect')
     }
     if (requireConfirm) {
-      return '点击确认后，前往目标链接。'
+      return t('clickConfirmToRedirect')
     }
     if (enableCountdown) {
-      return '请耐心等待前往目标链接...'
+      return t('pleaseWaitForRedirect')
     }
-    return '正在前往目标链接...'
+    return t('redirectingToTarget')
   }
 
   // 获取图标和颜色
@@ -125,7 +128,7 @@ export default function SafeRedirectClient({
     
     // 检查人机验证
     if (captchaEnabled && showCaptcha && !captchaVerified) {
-      setCaptchaError('请完成人机验证')
+      setCaptchaError(t('captchaRequired'))
       return
     }
     
@@ -146,12 +149,13 @@ export default function SafeRedirectClient({
 
         if (!captchaResponse.ok) {
           const captchaErrorData = await captchaResponse.json()
-          setCaptchaError(captchaErrorData.error || '人机验证失败，请重试')
+          setCaptchaError(captchaErrorData.error || t('captchaFailed'))
           setIsProcessing(false)
           return
         }
       }
 
+      // 验证密码（如果需要）
       const response = await fetch(`/api/visit/${path}`, {
         method: 'POST',
         headers: {
@@ -164,69 +168,96 @@ export default function SafeRedirectClient({
 
       if (response.ok) {
         const data = await response.json()
+        
+        // 在跳转前记录访问统计
+        try {
+          await fetch(`/api/track-visit/${path}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          })
+        } catch (trackError) {
+          console.error(t('trackVisitFailed') + ':', trackError)
+          // 统计失败不影响跳转
+        }
+        
         // 跳转到目标URL
         window.location.href = data.originalUrl
       } else {
         const errorData = await response.json()
-        setError(errorData.error || '访问失败')
+        setError(errorData.error || t('accessFailed'))
         setIsProcessing(false)
       }
     } catch (error) {
-      console.error('访问失败:', error)
-      setError('网络错误，请重试')
+      console.error(t('accessFailed') + ':', error)
+      setError(t('networkError'))
       setIsProcessing(false)
     }
-  }, [isProcessing, path, password])
+  }, [isProcessing, path, password, captchaEnabled, showCaptcha, captchaVerified, captchaToken])
 
   // 客户端水合完成后启用动画
   useEffect(() => {
+    let isMounted = true // 防止组件卸载后设置状态
+    
     setIsClient(true)
+    
     // 检查域名访问权限
-    checkDomainAccess()
+    const checkDomain = async () => {
+      try {
+        const response = await fetch('/api/check-domain', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ url: targetUrl })
+        })
+
+        if (response.ok && isMounted) {
+          const data = await response.json()
+          if (!data.allowed) {
+            setDomainBlocked(true)
+            setBlockReason(data.reason || t('targetBlocked'))
+          }
+        }
+      } catch (error) {
+        console.error(t('checkDomainAccessFailed') + ':', error)
+      }
+    }
+    
     // 加载系统设置
-    loadSystemSettings()
+    const loadSettings = async () => {
+      try {
+        const data = await requestCache.get('settings', async () => {
+          const response = await fetch('/api/settings')
+          if (response.ok) {
+            return response.json()
+          }
+          throw new Error('加载设置失败')
+        })
+        
+        if (isMounted) {
+          setCaptchaEnabled(data.captchaEnabled || false)
+          if (data.captchaEnabled) {
+            setShowCaptcha(true)
+          }
+          // 更新倒计时时间
+          setCountdown(data.waitTime || 5)
+        }
+      } catch (error) {
+        console.error(t('loadingSettings') + ':', error)
+      }
+    }
+
+    checkDomain()
+    loadSettings()
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
-  // 加载系统设置
-  const loadSystemSettings = async () => {
-    try {
-      const response = await fetch('/api/settings')
-      if (response.ok) {
-        const data = await response.json()
-        setCaptchaEnabled(data.captchaEnabled || false)
-        if (data.captchaEnabled) {
-          setShowCaptcha(true)
-        }
-        // 更新倒计时时间
-        setCountdown(data.waitTime || 5)
-      }
-    } catch (error) {
-      console.error('加载系统设置失败:', error)
-    }
-  }
 
-  // 检查域名访问权限
-  const checkDomainAccess = async () => {
-    try {
-      const response = await fetch('/api/check-domain', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url: targetUrl })
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (!data.allowed) {
-          setDomainBlocked(true)
-          setBlockReason(data.reason || '目标被拦截')
-        }
-      }
-    } catch (error) {
-      console.error('检查域名访问权限失败:', error)
-    }
-  }
 
   useEffect(() => {
     if (!enableCountdown || domainBlocked) return
@@ -275,14 +306,14 @@ export default function SafeRedirectClient({
   // 处理人机验证失败
   const handleCaptchaError = () => {
     setCaptchaToken('')
-    setCaptchaError('人机验证失败，请重试')
+    setCaptchaError(t('captchaFailed'))
     setCaptchaVerified(false)
   }
 
   // 处理人机验证过期
   const handleCaptchaExpire = () => {
     setCaptchaToken('')
-    setCaptchaError('人机验证已过期，请重新验证')
+    setCaptchaError(t('captchaExpired'))
     setCaptchaVerified(false)
   }
 
@@ -310,7 +341,7 @@ export default function SafeRedirectClient({
               <div className="absolute top-0 right-0 p-2 opacity-50 group-hover:opacity-100 transition-opacity">
                 <ExternalLink size={16} className="text-slate-400" />
               </div>
-              <div className="text-xs text-slate-400 uppercase font-bold mb-1">目标链接</div>
+              <div className="text-xs text-slate-400 uppercase font-bold mb-1">{t('targetUrl')}</div>
               <div className="text-[--color-primary] truncate font-medium">{targetUrl}</div>
               {title && (
                 <div className="text-sm text-slate-600 mt-2 flex items-center gap-2">
@@ -326,7 +357,7 @@ export default function SafeRedirectClient({
             <div className={`mb-6 text-left ${isClient ? 'animate-fade-in' : ''}`}>
               <label className="text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
                 <Lock size={14} className="text-[--color-warning]" /> 
-                此链接受密码保护
+                {t('passwordProtected')}
               </label>
               <div className={`cute-input-wrapper bg-white rounded-lg px-4 py-3 flex items-center gap-2 ${
                 error ? 'border-[--color-error] ring-1 ring-[--color-error]' : ''
@@ -334,7 +365,7 @@ export default function SafeRedirectClient({
                 <Lock size={18} className="text-slate-400" />
                 <input 
                   type="password" 
-                  placeholder="请输入访问密码"
+                  placeholder={t('enterPassword')}
                   className="w-full bg-transparent outline-none text-slate-800"
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setError(''); }}
@@ -373,7 +404,7 @@ export default function SafeRedirectClient({
           {!domainBlocked && enableCountdown && !isProcessing && (
             <div className={`mb-4 text-sm text-slate-400 font-medium ${isClient ? 'animate-fade-in' : ''}`}>
               <Clock size={14} className="inline mr-1 relative -top-px" />
-              将在 {countdown} 秒后自动跳转...
+              {t('redirectingIn', { s: countdown })}
             </div>
           )}
 
@@ -381,7 +412,7 @@ export default function SafeRedirectClient({
           {!domainBlocked && isProcessing && (
             <div className={`mb-4 text-sm text-[--color-primary] font-medium ${isClient ? 'animate-fade-in' : ''} flex items-center justify-center gap-2`}>
               <div className="w-4 h-4 border-2 border-[--color-primary]/30 border-t-[--color-primary] rounded-full animate-spin"></div>
-              正在跳转...
+              {t('processing')}
             </div>
           )}
 
@@ -392,7 +423,7 @@ export default function SafeRedirectClient({
                 onClick={handleCancel}
                 className="flex-1 px-4 py-3 rounded-xl font-medium text-slate-600 hover:bg-slate-100 transition-colors text-sm"
               >
-                取消访问
+                {t('cancelVisit')}
               </button>
               <button 
                 onClick={() => handleProceed()}
@@ -406,11 +437,11 @@ export default function SafeRedirectClient({
                 {hasPassword ? (
                   <>
                     <Lock size={16} />
-                    验证并跳转
+                    {t('verifyAndJump')}
                   </>
                 ) : (
                   <>
-                    立即跳转 <ArrowRight size={16} />
+                    {t('continue')} <ArrowRight size={16} />
                   </>
                 )}
               </button>

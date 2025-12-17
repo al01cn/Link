@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link2, Lock, Shield, Zap, X, ExternalLink, Calendar, Save, AlertCircle } from 'lucide-react'
 import { useConfirmDialog } from '@/lib/useDialog'
+import { useLanguage } from '@/lib/LanguageContext'
 import ConfirmDialog from './ConfirmDialog'
 
 interface ShortLink {
@@ -33,6 +34,7 @@ export default function EditLinkDialog({
   onSave, 
   onError 
 }: EditLinkDialogProps) {
+  const { t } = useLanguage()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [isLoading, setIsLoading] = useState(false)
   const confirmDialog = useConfirmDialog()
@@ -92,36 +94,36 @@ export default function EditLinkDialog({
 
     // URL验证
     if (!originalUrl.trim()) {
-      newErrors.originalUrl = '请输入链接地址'
+      newErrors.originalUrl = t('pleaseEnterUrl')
     } else {
       try {
         new URL(originalUrl)
       } catch {
-        newErrors.originalUrl = '请输入有效的URL格式'
+        newErrors.originalUrl = t('pleaseEnterValidUrl')
       }
     }
 
     // 自定义路径验证
     if (customPath.trim()) {
       if (!/^[a-zA-Z0-9_-]+$/.test(customPath)) {
-        newErrors.customPath = '路径只能包含字母、数字、下划线和连字符'
+        newErrors.customPath = t('pathOnlyLettersNumbers')
       } else if (customPath.length < 3) {
-        newErrors.customPath = '路径长度至少3个字符'
+        newErrors.customPath = t('pathMinLength')
       } else if (customPath.length > 50) {
-        newErrors.customPath = '路径长度不能超过50个字符'
+        newErrors.customPath = t('pathMaxLength')
       }
     }
 
     // 密码验证
     if (password.trim() && password.length < 4) {
-      newErrors.password = '密码长度至少4个字符'
+      newErrors.password = t('passwordMinLength')
     }
 
     // 过期时间验证
     if (expiresAt) {
       const expireDate = new Date(expiresAt)
       if (expireDate <= new Date()) {
-        newErrors.expiresAt = '过期时间必须晚于当前时间'
+        newErrors.expiresAt = t('expireTimeMustBeFuture')
       }
     }
 
@@ -153,6 +155,9 @@ export default function EditLinkDialog({
   const handleSave = async () => {
     if (!link || !validateForm()) return
 
+    // 防止重复提交
+    if (isLoading) return
+
     setIsLoading(true)
     
     try {
@@ -177,11 +182,11 @@ export default function EditLinkDialog({
         onClose()
       } else {
         const error = await response.json()
-        onError(error.error || '更新失败')
+        onError(error.error || t('updateFailed'))
       }
     } catch (error) {
       console.error('更新短链失败:', error)
-      onError('网络错误，请重试')
+      onError(t('networkError'))
     } finally {
       setIsLoading(false)
     }
@@ -204,10 +209,10 @@ export default function EditLinkDialog({
     if (hasChanges) {
       const confirmed = await confirmDialog.confirm({
         type: 'warning',
-        title: '确认关闭',
-        message: '您有未保存的更改，确定要关闭编辑对话框吗？',
-        confirmText: '确定关闭',
-        cancelText: '继续编辑'
+        title: t('confirmClose'),
+        message: t('unsavedChanges'),
+        confirmText: t('confirmClose'),
+        cancelText: t('continueEditing')
       })
       
       if (!confirmed) return
@@ -230,7 +235,7 @@ export default function EditLinkDialog({
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
               <Link2 size={24} className="text-blue-500" />
-              编辑短链
+              {t('editShortLink')}
             </h3>
             <button 
               onClick={handleClose}
@@ -247,7 +252,7 @@ export default function EditLinkDialog({
             {/* 原始链接 */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                原始链接 <span className="text-red-500">*</span>
+                {t('originalUrlRequired')} <span className="text-red-500">*</span>
               </label>
               <div className={`cute-input-wrapper bg-white rounded-lg px-4 py-3 flex items-center gap-2 ${
                 errors.originalUrl ? 'border-red-300 ring-1 ring-red-300' : ''
@@ -278,7 +283,7 @@ export default function EditLinkDialog({
             {/* 自定义路径 */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                自定义路径
+                {t('customPathOptional')}
               </label>
               <div className={`cute-input-wrapper bg-white rounded-lg px-4 py-3 flex items-center gap-2 ${
                 errors.customPath ? 'border-red-300 ring-1 ring-red-300' : ''
@@ -288,7 +293,7 @@ export default function EditLinkDialog({
                 </span>
                 <input 
                   type="text" 
-                  placeholder="自定义路径"
+                  placeholder={t('customPathPlaceholder')}
                   className="w-full bg-transparent outline-none text-slate-800"
                   value={customPath}
                   onChange={(e) => {
@@ -307,14 +312,14 @@ export default function EditLinkDialog({
                 </p>
               )}
               <p className="text-xs text-slate-500 mt-1">
-                留空则保持当前路径不变
+                {t('keepCurrentPath')}
               </p>
             </div>
 
             {/* 访问密码 */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                访问密码
+                {t('accessPasswordOptional')}
               </label>
               <div className={`cute-input-wrapper bg-white rounded-lg px-4 py-3 flex items-center gap-2 ${
                 errors.password ? 'border-red-300 ring-1 ring-red-300' : ''
@@ -322,7 +327,7 @@ export default function EditLinkDialog({
                 <Lock size={18} className="text-slate-400" />
                 <input 
                   type="text" 
-                  placeholder="设置访问密码"
+                  placeholder={t('setPassword')}
                   className="w-full bg-transparent outline-none text-slate-800"
                   value={password}
                   onChange={(e) => {
@@ -342,7 +347,7 @@ export default function EditLinkDialog({
               )}
               {link.hasPassword && !password.trim() && (
                 <p className="text-xs text-amber-600 mt-1">
-                  当前已设置密码，留空表示保持原密码不变
+                  {t('keepCurrentPassword')}
                 </p>
               )}
             </div>
@@ -350,7 +355,7 @@ export default function EditLinkDialog({
             {/* 过期时间 */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                过期时间
+                {t('expirationTimeOptional')}
               </label>
               <div className={`cute-input-wrapper bg-white rounded-lg px-4 py-3 flex items-center gap-2 ${
                 errors.expiresAt ? 'border-red-300 ring-1 ring-red-300' : ''
@@ -376,7 +381,7 @@ export default function EditLinkDialog({
                 </p>
               )}
               <p className="text-xs text-slate-500 mt-1">
-                留空表示永不过期
+                {t('neverExpire')}
               </p>
             </div>
 
@@ -392,9 +397,9 @@ export default function EditLinkDialog({
                     <Zap size={16} />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-slate-700">启用过渡页</span>
+                    <span className="text-sm font-medium text-slate-700">{t('enableTransitionPageAuto')}</span>
                     <span className="text-xs text-slate-500">
-                      {password.trim() ? '设置密码时自动启用' : '显示跳转确认页面'}
+                      {password.trim() ? t('autoEnabledWithPassword') : t('showTransitionPage')}
                     </span>
                   </div>
                 </div>
@@ -423,9 +428,9 @@ export default function EditLinkDialog({
                     <Shield size={16} />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-slate-700">强制二次确认</span>
+                    <span className="text-sm font-medium text-slate-700">{t('forceConfirmManual')}</span>
                     <span className="text-xs text-slate-500">
-                      {password.trim() ? '设置密码时自动启用' : '需要用户确认'}
+                      {password.trim() ? t('autoEnabledWithPassword') : t('requireUserConfirm')}
                     </span>
                   </div>
                 </div>
@@ -453,7 +458,7 @@ export default function EditLinkDialog({
               disabled={isLoading}
               className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors disabled:opacity-50"
             >
-              取消
+              {t('cancel')}
             </button>
             <button 
               onClick={handleSave}
@@ -463,12 +468,12 @@ export default function EditLinkDialog({
               {isLoading ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  保存中...
+                  {t('saving')}
                 </>
               ) : (
                 <>
                   <Save size={16} />
-                  保存更改
+                  {t('saveChanges')}
                 </>
               )}
             </button>

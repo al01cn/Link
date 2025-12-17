@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { translateForRequest } from '@/lib/translations'
 
 // UUID 验证函数
 function isValidUUID(uuid: string): boolean {
@@ -19,7 +20,7 @@ export async function DELETE(
     
     // 验证 UUID 格式
     if (!id || !isValidUUID(id)) {
-      return NextResponse.json({ error: '无效的ID格式' }, { status: 400 })
+      return NextResponse.json({ error: translateForRequest(request, 'apiInvalidIdFormat') }, { status: 400 })
     }
 
     // 先检查记录是否存在
@@ -28,7 +29,7 @@ export async function DELETE(
     })
 
     if (!existingRule) {
-      return NextResponse.json({ error: '域名规则不存在' }, { status: 404 })
+      return NextResponse.json({ error: translateForRequest(request, 'apiDomainRuleNotFound') }, { status: 404 })
     }
 
     // 执行删除操作
@@ -38,7 +39,7 @@ export async function DELETE(
 
     return NextResponse.json({ 
       success: true, 
-      message: '删除成功', 
+      message: translateForRequest(request, 'apiDeleteSuccess'), 
       deletedRule: deleteResult 
     })
   } catch (error) {
@@ -47,16 +48,16 @@ export async function DELETE(
     // 处理 Prisma 特定错误
     if (error instanceof Error) {
       if (error.message.includes('Record to delete does not exist')) {
-        return NextResponse.json({ error: '域名规则不存在' }, { status: 404 })
+        return NextResponse.json({ error: translateForRequest(request, 'apiDomainRuleNotFound') }, { status: 404 })
       }
       
       if (error.message.includes('Foreign key constraint')) {
-        return NextResponse.json({ error: '无法删除：存在关联数据' }, { status: 400 })
+        return NextResponse.json({ error: translateForRequest(request, 'apiInvalidIdFormat') }, { status: 400 })
       }
     }
     
     return NextResponse.json({ 
-      error: '服务器内部错误', 
+      error: translateForRequest(request, 'serverError'), 
       details: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined 
     }, { status: 500 })
   }

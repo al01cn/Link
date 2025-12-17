@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import { translateForRequest } from '@/lib/translations'
 
 // 管理员登录
 export async function POST(request: NextRequest) {
@@ -9,7 +10,7 @@ export async function POST(request: NextRequest) {
     const { username, password } = await request.json()
 
     if (!username || !password) {
-      return NextResponse.json({ error: '用户名和密码不能为空' }, { status: 400 })
+      return NextResponse.json({ error: translateForRequest(request, 'apiUsernamePasswordRequired') }, { status: 400 })
     }
 
     // 查找管理员账户
@@ -31,13 +32,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (!admin) {
-      return NextResponse.json({ error: '用户名或密码错误' }, { status: 401 })
+      return NextResponse.json({ error: translateForRequest(request, 'apiInvalidCredentials') }, { status: 401 })
     }
 
     // 验证密码
     const isValidPassword = await bcrypt.compare(password, admin.password)
     if (!isValidPassword) {
-      return NextResponse.json({ error: '用户名或密码错误' }, { status: 401 })
+      return NextResponse.json({ error: translateForRequest(request, 'apiInvalidCredentials') }, { status: 401 })
     }
 
     // 生成JWT token
@@ -56,6 +57,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('管理员登录错误:', error)
-    return NextResponse.json({ error: '服务器错误' }, { status: 500 })
+    return NextResponse.json({ error: translateForRequest(request, 'serverError') }, { status: 500 })
   }
 }

@@ -25,7 +25,7 @@ interface SettingsViewProps {
   onClose: () => void
   settings: SettingsData
   setSettings: (settings: SettingsData) => void
-  t: (key: TranslationKey) => string
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string
 }
 
 export default function SettingsView({ onClose, settings, setSettings, t }: SettingsViewProps) {
@@ -34,6 +34,8 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
   const [isLoading, setIsLoading] = useState(true)
   const [isAddingDomain, setIsAddingDomain] = useState(false)
   const [isClient, setIsClient] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null)
   
   // 对话框 hooks
   const confirmDialog = useConfirmDialog()
@@ -68,28 +70,61 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
     }
   }
 
-  // 保存设置
+  // 防抖保存设置
   const saveSettings = async (newSettings: SettingsData) => {
-    try {
-      const response = await fetch('/api/settings', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          securityMode: newSettings.mode,
-          waitTime: newSettings.waitTime,
-          captchaEnabled: newSettings.captchaEnabled
-        })
-      })
-      
-      if (response.ok) {
-        setSettings(newSettings)
-      }
-    } catch (error) {
-      console.error('保存设置失败:', error)
+    // 立即更新本地状态
+    setSettings(newSettings)
+    
+    // 清除之前的定时器
+    if (saveTimeout) {
+      clearTimeout(saveTimeout)
     }
+    
+    // 设置新的防抖定时器
+    const timeout = setTimeout(async () => {
+      setIsSaving(true)
+      try {
+        const response = await fetch('/api/settings', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            securityMode: newSettings.mode,
+            waitTime: newSettings.waitTime,
+            captchaEnabled: newSettings.captchaEnabled
+          })
+        })
+        
+        if (!response.ok) {
+          // 如果保存失败，显示错误提示
+          notificationDialog.notify({
+            type: 'error',
+            message: '保存设置失败，请重试'
+          })
+        }
+      } catch (error) {
+        console.error('保存设置失败:', error)
+        notificationDialog.notify({
+          type: 'error',
+          message: '保存设置失败，请检查网络连接'
+        })
+      } finally {
+        setIsSaving(false)
+      }
+    }, 500) // 500ms 防抖延迟
+    
+    setSaveTimeout(timeout)
   }
+
+  // 清理定时器
+  useEffect(() => {
+    return () => {
+      if (saveTimeout) {
+        clearTimeout(saveTimeout)
+      }
+    }
+  }, [saveTimeout])
 
   // 添加域名规则
   const addDomain = async () => {
@@ -116,14 +151,14 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
         const error = await response.json()
         notificationDialog.notify({
           type: 'error',
-          message: error.error || '添加失败'
+          message: error.error || t('addDomainFailed')
         })
       }
     } catch (error) {
       console.error('添加域名失败:', error)
       notificationDialog.notify({
         type: 'error',
-        message: '添加失败'
+        message: t('addDomainFailed')
       })
     } finally {
       setIsAddingDomain(false)
@@ -134,10 +169,10 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
   const deleteDomain = async (id: string) => {
     const confirmed = await confirmDialog.confirm({
       type: 'danger',
-      title: '确认删除',
-      message: '确定要删除这个域名规则吗？',
-      confirmText: '删除',
-      cancelText: '取消'
+      title: t('confirmDeleteTitle'),
+      message: t('confirmDeleteDomain'),
+      confirmText: t('delete'),
+      cancelText: t('cancel')
     })
     
     if (!confirmed) return
@@ -160,22 +195,22 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
       } else {
         // 处理不同的错误状态码
         const errorData = await response.json()
-        let errorMessage = '删除失败'
+        let errorMessage = t('deleteDomainFailed')
         
         switch (response.status) {
           case 400:
-            errorMessage = `请求错误: ${errorData.error || '无效的请求参数'}`
+            errorMessage = `${t('requestError')}: ${errorData.error || t('invalidRequestParams')}`
             break
           case 404:
-            errorMessage = `域名规则不存在: ${errorData.error || '记录未找到'}`
+            errorMessage = `${t('domainRuleNotExists')}: ${errorData.error || t('recordNotFound')}`
             // 即使是404，也从本地状态中移除（可能已被其他地方删除）
             setDomainRules(domainRules.filter(rule => rule.id !== id))
             break
           case 500:
-            errorMessage = `服务器错误: ${errorData.error || '请稍后重试'}`
+            errorMessage = `${t('serverError')}: ${errorData.error || t('pleaseTryLater')}`
             break
           default:
-            errorMessage = `删除失败 (${response.status}): ${errorData.error || '未知错误'}`
+            errorMessage = `${t('deleteFailedWithStatus', { status: response.status })}: ${errorData.error || t('unknownError')}`
         }
         
         notificationDialog.notify({
@@ -188,7 +223,7 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
       console.error('删除域名网络错误:', error)
       notificationDialog.notify({
         type: 'error',
-        message: '网络错误，请检查连接后重试'
+        message: t('networkErrorCheckConnection')
       })
     }
   }
@@ -200,10 +235,18 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
     <div className={`max-w-2xl mx-auto mt-10 pb-20 ${isClient ? 'animate__animated animate__fadeInUp' : ''}`}>
       <div className="cute-card p-8">
         <div className="flex justify-between items-center mb-8">
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Settings className="text-[var(--color-primary)]" />
-            {t('systemSettings')}
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <Settings className="text-[var(--color-primary)]" />
+              {t('systemSettings')}
+            </h2>
+            {isSaving && (
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <div className="w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                保存中...
+              </div>
+            )}
+          </div>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-400">
             <X size={24} />
           </button>
@@ -340,13 +383,23 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
               {settings.mode === 'whitelist' ? t('whitelistDomains') : t('blacklistDomains')}
             </h3>
             
+            {/* 域名规范说明 */}
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h4 className="text-sm font-medium text-blue-800 mb-2">域名填写规范</h4>
+              <div className="text-xs text-blue-700 space-y-1">
+                <div><code className="bg-blue-100 px-1 rounded">*.example.com</code> - 匹配所有子域名（包括主域名）</div>
+                <div><code className="bg-blue-100 px-1 rounded">example.com</code> - 只匹配主域名，不包括子域名</div>
+                <div><code className="bg-blue-100 px-1 rounded">sub.example.com</code> - 只匹配特定子域名</div>
+              </div>
+            </div>
+
             {/* 添加域名输入框 */}
             <div className="mb-4">
               <div className="flex gap-2">
                 <div className="cute-input-wrapper flex-1 bg-white rounded-lg px-3 py-2 flex items-center gap-2 text-sm">
                   <input 
                     type="text" 
-                    placeholder="输入域名，如 example.com"
+                    placeholder="例如：*.example.com 或 example.com"
                     className="w-full outline-none text-slate-700"
                     value={newDomain}
                     onChange={(e) => setNewDomain(e.target.value)}
@@ -380,38 +433,59 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
               {isLoading ? (
                 <div className="text-center py-4 text-slate-400">
                   <div className="w-6 h-6 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin mx-auto mb-2" />
-                  加载中...
+                  {t('loading')}
                 </div>
               ) : currentDomains.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                  {currentDomains.map(rule => (
-                    <span 
-                      key={rule.id} 
-                      className={`bg-white px-3 py-1 rounded-full text-sm text-slate-600 border shadow-sm flex items-center gap-2 group hover:bg-slate-50 ${
-                        settings.mode === 'whitelist' ? 'border-slate-200' : 'border-red-100'
-                      }`}
-                    >
-                      <span className={`w-2 h-2 rounded-full ${
-                        settings.mode === 'whitelist' ? 'bg-[var(--color-success)]' : 'bg-[var(--color-error)]'
-                      }`}></span>
-                      {rule.domain}
-                      <button
-                        onClick={() => deleteDomain(rule.id)}
-                        className="ml-1 p-1 rounded-full hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                        title="删除"
+                  {currentDomains.map(rule => {
+                    // 判断域名规则类型
+                    const isWildcard = rule.domain.startsWith('*.')
+                    const isSubdomain = !isWildcard && rule.domain.includes('.') && rule.domain.split('.').length > 2
+                    
+                    return (
+                      <span 
+                        key={rule.id} 
+                        className={`bg-white px-3 py-1 rounded-full text-sm text-slate-600 border shadow-sm flex items-center gap-2 group hover:bg-slate-50 ${
+                          settings.mode === 'whitelist' ? 'border-slate-200' : 'border-red-100'
+                        }`}
                       >
-                        <Trash2 size={12} />
-                      </button>
-                    </span>
-                  ))}
+                        <span className={`w-2 h-2 rounded-full ${
+                          settings.mode === 'whitelist' ? 'bg-[var(--color-success)]' : 'bg-[var(--color-error)]'
+                        }`}></span>
+                        <span className="font-mono">{rule.domain}</span>
+                        {isWildcard && (
+                          <span className="text-xs bg-blue-100 text-blue-600 px-1 rounded" title="匹配所有子域名">
+                            通配符
+                          </span>
+                        )}
+                        {isSubdomain && !isWildcard && (
+                          <span className="text-xs bg-green-100 text-green-600 px-1 rounded" title="特定子域名">
+                            子域名
+                          </span>
+                        )}
+                        {!isWildcard && !isSubdomain && (
+                          <span className="text-xs bg-gray-100 text-gray-600 px-1 rounded" title="仅主域名">
+                            主域名
+                          </span>
+                        )}
+                        <button
+                          onClick={() => deleteDomain(rule.id)}
+                          className="ml-1 p-1 rounded-full hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                          title={t('delete')}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </span>
+                    )
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-6 text-slate-400">
                   <Shield size={32} className="mx-auto mb-2 opacity-50" />
                   <p className="text-sm">
-                    {settings.mode === 'whitelist' ? '白名单为空，将拦截所有域名' : '黑名单为空，允许所有域名'}
+                    {settings.mode === 'whitelist' ? t('whitelistEmpty') : t('blacklistEmpty')}
                   </p>
-                  <p className="text-xs mt-1">在上方添加域名规则</p>
+                  <p className="text-xs mt-1">{t('addDomainRules')}</p>
                 </div>
               )}
             </div>

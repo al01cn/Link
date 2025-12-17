@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isValidUrl, fetchPageTitle } from '@/lib/utils'
 import { logActivity, logError } from '@/lib/logger'
+import { useTranslation } from '@/lib/translations'
 
 /**
  * 跳转类型枚举（Redirect type enumeration）
@@ -75,7 +76,13 @@ interface QuickRedirectResponse {
  * @see {@link QuickRedirectResponse} 响应数据接口（Response data interface）
  */
 export async function GET(request: NextRequest): Promise<NextResponse<QuickRedirectResponse | { error: string }>> {
+  // 获取语言偏好（Get language preference）
+  const acceptLanguage = request.headers.get('accept-language') || 'zh'
+  const language = acceptLanguage.includes('en') ? 'en' : 'zh'
+  const t = useTranslation(language)
+  
   try {
+    
     // 解析查询参数（Parse query parameters）
     const { searchParams } = new URL(request.url)
     /** URL参数：目标链接地址（URL parameter: target link address） */
@@ -87,7 +94,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<QuickRedir
 
     // 参数验证：url和token必须提供其中一个（Parameter validation: either url or token must be provided）
     if (!urlParam && !tokenParam) {
-      return NextResponse.json({ error: '必须提供url或token参数其中一个' }, { status: 400 })
+      return NextResponse.json({ error: t('apiMissingUrlOrToken') }, { status: 400 })
     }
 
     // 初始化配置变量（Initialize configuration variables）
@@ -98,37 +105,98 @@ export async function GET(request: NextRequest): Promise<NextResponse<QuickRedir
     /** 跳转类型（Redirect type） */
     let redirectType: RedirectType = 'auto'
     /** 显示消息（Display message） */
-    let msg = '正在前往目标链接...'
+    let msg = t('redirectingToTarget')
     /** 是否启用人机验证（Whether to enable CAPTCHA verification） */
     let captchaEnabled = false
 
     // Token参数处理（优先级更高）（Token parameter processing - higher priority）
     if (tokenParam) {
       try {
+        // 处理 token 的多种编码情况
+        let processedToken = tokenParam;
+        
+        // 1. 先尝试 URL 解码
+        try {
+          const urlDecoded = decodeURIComponent(tokenParam);
+          if (urlDecoded !== tokenParam) {
+            processedToken = urlDecoded;
+            console.log('检测到 URL 编码，已解码');
+          }
+        } catch (urlError) {
+          console.log('URL 解码失败，使用原始 token');
+        }
+        
+        // 2. 处理 URL 参数中空格被转换的问题（+ 变成空格）
+        if (processedToken.includes(' ')) {
+          processedToken = processedToken.replace(/ /g, '+');
+          console.log('修复了空格转换问题');
+        }
+
         /**
          * 解码Base64 Token并解析JSON配置（Decode Base64 Token and parse JSON configuration）
          * @description 将Base64编码的Token解码为UTF-8字符串，然后解析为JSON对象（Decode Base64 encoded Token to UTF-8 string, then parse as JSON object）
          */
-        const decodedToken = Buffer.from(tokenParam, 'base64').toString('utf-8')
+        const decodedToken = Buffer.from(processedToken, 'base64').toString('utf-8')
+        
+        // 检查解码后的字符串是否完整
+        if (!decodedToken.trim().endsWith('}')) {
+          throw new Error('Token 解码后的 JSON 字符串不完整，可能被截断');
+        }
+        
         /** Token配置对象（Token configuration object） */
         const tokenConfig: TokenConfig = JSON.parse(decodedToken)
 
         // Token配置验证（Token configuration validation）
         if (!tokenConfig.url) {
-          return NextResponse.json({ error: 'Token中缺少url字段' }, { status: 400 })
+          return NextResponse.json({ error: t('tokenMissingUrlField') }, { status: 400 })
         }
 
         // 应用Token配置（Apply Token configuration）
         targetUrl = tokenConfig.url
         title = tokenConfig.title || null
-        msg = tokenConfig.msg || '正在前往目标链接...'
+        msg = tokenConfig.msg || t('redirectingToTarget')
         captchaEnabled = tokenConfig.turnstile || false
 
         // 处理跳转类型（Handle redirect type）
         redirectType = tokenConfig.type || 'auto'
 
-      } catch (error) {
-        return NextResponse.json({ error: '无效的Token格式' }, { status: 400 })
+      } catch (error: unknown) {
+        // 提供更详细的错误信息以便调试
+        let errorMessage = t('invalidTokenFormat');
+        let debugInfo: any = {};
+        
+        if (error instanceof SyntaxError) {
+          errorMessage = t('tokenNotValidJson');
+          debugInfo.type = 'JSON_PARSE_ERROR';
+          debugInfo.message = error.message;
+        } else if (error instanceof Error) {
+          if (error.message?.includes('Invalid character')) {
+            errorMessage = t('tokenNotValidBase64');
+            debugInfo.type = 'BASE64_DECODE_ERROR';
+          }
+          debugInfo.message = error.message;
+        }
+        
+        // 添加 token 调试信息
+        try {
+          const decodedToken = Buffer.from(tokenParam, 'base64').toString('utf-8');
+          debugInfo.decodedLength = decodedToken.length;
+          debugInfo.decodedPreview = decodedToken.substring(0, 100);
+        } catch (decodeError) {
+          debugInfo.decodeError = 'Base64解码失败';
+        }
+        
+        console.error('Token解析失败:', {
+          token: tokenParam,
+          tokenLength: tokenParam.length,
+          error: error instanceof Error ? error.message : String(error),
+          debugInfo
+        });
+        
+        return NextResponse.json({ 
+          error: errorMessage,
+          details: process.env.NODE_ENV === 'development' ? debugInfo : undefined
+        }, { status: 400 })
       }
     } else {
       /**
@@ -151,7 +219,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<QuickRedir
      * @description 使用工具函数验证目标URL的格式是否正确（Use utility function to validate target URL format）
      */
     if (!isValidUrl(targetUrl)) {
-      return NextResponse.json({ error: '无效的URL格式' }, { status: 400 })
+      return NextResponse.json({ error: t('invalidUrlFormat') }, { status: 400 })
     }
 
     /**
@@ -163,15 +231,15 @@ export async function GET(request: NextRequest): Promise<NextResponse<QuickRedir
     }
 
     /**
-     * 记录TO跳转日志（Record TO redirect log）
-     * @description 记录通过TO路径进行的跳转访问（Record redirect access through TO path）
+     * 记录TO跳转准备日志（Record TO redirect preparation log）
+     * @description 记录通过TO路径准备跳转的请求，实际访问统计将在真正跳转时记录（Record TO path redirect preparation request, actual visit statistics will be recorded when actually redirecting）
      */
     await logActivity({
-      type: 'visit',
-      message: `TO跳转访问: ${targetUrl}`,
+      type: 'prepare',
+      message: `${t('toPrepareRedirect')}: ${targetUrl}`,
       details: {
         targetUrl,
-        title: title || '外部链接',
+        title: title || t('externalLink'),
         type: redirectType,
         msg,
         captchaEnabled,
@@ -186,7 +254,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<QuickRedir
      */
     const response: QuickRedirectResponse = {
       originalUrl: targetUrl,
-      title: title || '外部链接',
+      title: title || t('externalLink'),
       type: redirectType,
       enableIntermediate: true,
       msg,
@@ -200,8 +268,8 @@ export async function GET(request: NextRequest): Promise<NextResponse<QuickRedir
      * 错误处理（Error handling）
      * @description 捕获并记录所有未预期的错误，返回通用错误响应（Catch and log all unexpected errors, return generic error response）
      */
-    console.error('处理快速跳转失败:', error)
-    await logError('处理快速跳转失败', error, request)
-    return NextResponse.json({ error: '服务器错误' }, { status: 500 })
+    console.error(t('processQuickRedirectFailed') + ':', error)
+    await logError(t('processQuickRedirectFailed'), error, request)
+    return NextResponse.json({ error: t('apiServerError') }, { status: 500 })
   }
 }

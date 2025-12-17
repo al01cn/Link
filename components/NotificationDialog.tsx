@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { X, AlertTriangle, Info, CheckCircle, XCircle } from 'lucide-react'
+import { useLanguage } from '@/lib/LanguageContext'
 
 interface NotificationDialogProps {
   isOpen: boolean
@@ -18,8 +19,9 @@ export default function NotificationDialog({
   title,
   message,
   type = 'info',
-  confirmText = '确定'
+  confirmText
 }: NotificationDialogProps) {
+  const { t } = useLanguage()
   const [isVisible, setIsVisible] = useState(false)
 
   useEffect(() => {
@@ -73,15 +75,15 @@ export default function NotificationDialog({
   const getDefaultTitle = () => {
     switch (type) {
       case 'success':
-        return '成功'
+        return t('success')
       case 'error':
-        return '错误'
+        return t('error')
       case 'warning':
-        return '警告'
+        return t('warning')
       case 'info':
-        return '提示'
+        return t('info')
       default:
-        return '提示'
+        return t('info')
     }
   }
 
@@ -116,7 +118,7 @@ export default function NotificationDialog({
           <div className="p-6">
             <div className="flex items-start space-x-4">
               {/* 图标 */}
-              <div className="flex-shrink-0">
+              <div className="shrink-0">
                 {getIcon()}
               </div>
               
@@ -137,7 +139,7 @@ export default function NotificationDialog({
                 onClick={handleClose}
                 className={`px-4 py-2 text-sm font-medium text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors ${getButtonColor()}`}
               >
-                {confirmText}
+                {confirmText || t('ok')}
               </button>
             </div>
           </div>

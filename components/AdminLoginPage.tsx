@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Lock, User, Eye, EyeOff, AlertCircle, Shield, Globe } from 'lucide-react'
 import { useAdmin } from '@/lib/AdminContext'
-import { useTranslation, type Language } from '@/lib/translations'
+import { useLanguage } from '@/lib/LanguageContext'
 import { useNotificationDialog } from '@/lib/useDialog'
 import NotificationDialog from './NotificationDialog'
 
@@ -13,14 +13,13 @@ export default function AdminLoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const [lang, setLang] = useState<Language>('zh')
   const { login } = useAdmin()
-  const t = useTranslation(lang)
+  const { language, setLanguage, t } = useLanguage()
   
   // 通知对话框 hook
   const notificationDialog = useNotificationDialog()
   
-  const toggleLang = () => setLang(prev => prev === 'zh' ? 'en' : 'zh')
+  const toggleLang = () => setLanguage(language === 'zh' ? 'en' : 'zh')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,6 +27,9 @@ export default function AdminLoginPage() {
       setError(t('pleaseEnterUsernamePassword'))
       return
     }
+
+    // 防止重复提交
+    if (isLoading) return
 
     setIsLoading(true)
     setError('')
@@ -50,7 +52,7 @@ export default function AdminLoginPage() {
         if (data.isDefault) {
           notificationDialog.notify({
             type: 'warning',
-            title: '安全提醒',
+            title: t('warning'),
             message: t('defaultAccountWarning')
           })
         }
@@ -77,7 +79,7 @@ export default function AdminLoginPage() {
           <Globe size={18} />
           <span className="sr-only">{t('switchLanguage')}</span>
           <span className="absolute -bottom-1 -right-1 text-[10px] font-bold bg-slate-200 px-1 rounded text-slate-600">
-            {lang.toUpperCase()}
+            {language.toUpperCase()}
           </span>
         </button>
       </div>

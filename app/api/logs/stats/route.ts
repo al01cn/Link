@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { translateForRequest } from '@/lib/translations'
 
 const prisma = new PrismaClient()
 
@@ -72,6 +73,6 @@ export async function GET(request: NextRequest): Promise<NextResponse<LogStats |
 
   } catch (error) {
     console.error('获取日志统计失败:', error)
-    return NextResponse.json({ error: '获取日志统计失败' }, { status: 500 })
+    return NextResponse.json({ error: translateForRequest(request, 'serverError') }, { status: 500 })
   }
 }

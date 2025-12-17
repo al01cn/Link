@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db'
 import { generateShortPath, isValidUrl, fetchPageTitle, extractDomain, checkDomainAccessServer } from '@/lib/utils'
 import { encryptPassword } from '@/lib/crypto'
 import { logCreate, logError } from '@/lib/logger'
+import { translateForRequest } from '@/lib/translations'
 
 // 创建短链
 export async function POST(request: NextRequest) {
@@ -19,19 +20,19 @@ export async function POST(request: NextRequest) {
 
     // 验证URL
     if (!isValidUrl(originalUrl)) {
-      return NextResponse.json({ error: '无效的URL格式' }, { status: 400 })
+      return NextResponse.json({ error: translateForRequest(request, 'invalidUrlFormat') }, { status: 400 })
     }
 
     // 验证自定义路径
     if (customPath) {
       if (!/^[a-zA-Z0-9_-]+$/.test(customPath)) {
-        return NextResponse.json({ error: '路径只能包含字母、数字、下划线和连字符' }, { status: 400 })
+        return NextResponse.json({ error: translateForRequest(request, 'pathOnlyLettersNumbers') }, { status: 400 })
       }
       if (customPath.length < 3) {
-        return NextResponse.json({ error: '路径长度至少3个字符' }, { status: 400 })
+        return NextResponse.json({ error: translateForRequest(request, 'pathMinLength') }, { status: 400 })
       }
       if (customPath.length > 50) {
-        return NextResponse.json({ error: '路径长度不能超过50个字符' }, { status: 400 })
+        return NextResponse.json({ error: translateForRequest(request, 'pathMaxLength') }, { status: 400 })
       }
     }
 
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
       const accessCheck = await checkDomainAccessServer(domain, securityMode, domainRules)
       if (!accessCheck.allowed) {
         return NextResponse.json({ 
-          error: `无法创建短链：${accessCheck.reason}` 
+          error: translateForRequest(request, 'apiDomainAccessForbidden')
         }, { status: 403 })
       }
     }
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
     
     if (existingUrl) {
       return NextResponse.json({ 
-        error: '该链接已存在短链',
+        error: translateForRequest(request, 'linkExists'),
         existingLink: {
           id: existingUrl.id,
           path: existingUrl.path,
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest) {
     
     if (existing) {
       if (customPath) {
-        return NextResponse.json({ error: '自定义路径已存在' }, { status: 400 })
+        return NextResponse.json({ error: translateForRequest(request, 'linkExists') }, { status: 400 })
       }
       // 如果是随机生成的路径冲突，重新生成
       path = generateShortPath()
@@ -134,12 +135,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('创建短链失败:', error)
     await logError('创建短链失败', error, request)
-    return NextResponse.json({ error: '服务器错误' }, { status: 500 })
+    return NextResponse.json({ error: translateForRequest(request, 'serverError') }, { status: 500 })
   }
 }
 
 // 获取短链列表
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const links = await prisma.shortLink.findMany({
       orderBy: { createdAt: 'desc' },
@@ -164,6 +165,6 @@ export async function GET() {
     return NextResponse.json(formattedLinks)
   } catch (error) {
     console.error('获取短链列表失败:', error)
-    return NextResponse.json({ error: '服务器错误' }, { status: 500 })
+    return NextResponse.json({ error: translateForRequest(request, 'serverError') }, { status: 500 })
   }
 }

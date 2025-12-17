@@ -15,6 +15,10 @@ interface SafeRedirectViewProps {
   onProceed: (password?: string, captchaToken?: string) => void
   onCancel: () => void
   t: (key: TranslationKey, params?: Record<string, string | number>) => string
+  // TO模式相关参数
+  isToMode?: boolean
+  redirectType?: string
+  source?: string
 }
 
 export default function SafeRedirectView({ 
@@ -26,7 +30,10 @@ export default function SafeRedirectView({
   captchaEnabled,
   onProceed, 
   onCancel,
-  t
+  t,
+  isToMode = false,
+  redirectType = 'auto',
+  source = 'unknown'
 }: SafeRedirectViewProps) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -64,7 +71,7 @@ export default function SafeRedirectView({
   // 获取显示标题
   const getDisplayTitle = () => {
     if (domainBlocked) {
-      return '目标被拦截'
+      return t('targetBlocked')
     }
     if (title) {
       return truncateTitle(title)
@@ -75,21 +82,21 @@ export default function SafeRedirectView({
   // 获取描述文字
   const getDescription = () => {
     if (domainBlocked) {
-      return `${blockReason}，${blockCountdown} 秒后自动关闭...`
+      return t('blockReasonWithCountdown', { reason: blockReason, countdown: blockCountdown })
     }
     if (captchaEnabled && showCaptcha && !captchaVerified) {
-      return '请完成人机验证后继续...'
+      return t('completeCaptchaToContinue')
     }
     if (hasPassword) {
-      return '确认密码后，将前往目标链接...'
+      return t('confirmPasswordToRedirect')
     }
     if (requireConfirm) {
-      return '点击确认后，前往目标链接。'
+      return t('clickConfirmToRedirect')
     }
     if (enableCountdown) {
-      return '请耐心等待前往目标链接...'
+      return t('pleaseWaitForRedirect')
     }
-    return '正在前往目标链接...'
+    return t('redirectingToTarget')
   }
 
   // 获取图标和颜色
@@ -151,11 +158,11 @@ export default function SafeRedirectView({
         const data = await response.json()
         if (!data.allowed) {
           setDomainBlocked(true)
-          setBlockReason(data.reason || '目标被拦截')
+          setBlockReason(data.reason || t('targetBlocked'))
         }
       }
     } catch (error) {
-      console.error('检查域名访问权限失败:', error)
+      console.error(t('checkDomainAccessFailed') + ':', error)
     }
   }
 
@@ -168,9 +175,39 @@ export default function SafeRedirectView({
       }, 1000)
       return () => clearInterval(timer)
     } else {
-      onProceed() // 自动跳转
+      // 自动跳转前记录统计
+      handleAutoRedirect()
     }
   }, [countdown, enableCountdown, onProceed, domainBlocked])
+
+  // 处理自动跳转
+  const handleAutoRedirect = async () => {
+    if (isToMode) {
+      // TO模式：记录TO访问统计
+      try {
+        await fetch('/api/track-to-visit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            targetUrl,
+            title,
+            type: redirectType,
+            source
+          })
+        })
+      } catch (error) {
+        console.error(t('trackToVisitFailed') + ':', error)
+        // 统计失败不影响跳转
+      }
+      // 直接跳转
+      window.location.href = targetUrl
+    } else {
+      // 普通模式：调用原有的跳转逻辑
+      onProceed()
+    }
+  }
 
   // 域名被拦截时的倒计时
   useEffect(() => {
@@ -187,7 +224,7 @@ export default function SafeRedirectView({
     }
   }, [blockCountdown, domainBlocked])
 
-  const handleAuth = () => {
+  const handleAuth = async () => {
     if (hasPassword && !password) {
       setError(t('passwordError'))
       return
@@ -198,7 +235,31 @@ export default function SafeRedirectView({
       return
     }
     
-    onProceed(password, captchaToken)
+    if (isToMode) {
+      // TO模式：记录TO访问统计后直接跳转
+      try {
+        await fetch('/api/track-to-visit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            targetUrl,
+            title,
+            type: redirectType,
+            source
+          })
+        })
+      } catch (error) {
+        console.error(t('trackToVisitFailed') + ':', error)
+        // 统计失败不影响跳转
+      }
+      // 直接跳转
+      window.location.href = targetUrl
+    } else {
+      // 普通模式：调用原有的跳转逻辑
+      onProceed(password, captchaToken)
+    }
   }
 
   // 处理人机验证成功
@@ -323,7 +384,7 @@ export default function SafeRedirectView({
               onClick={onCancel}
               className="flex-1 px-4 py-3 rounded-xl font-medium text-slate-600 hover:bg-slate-100 transition-colors text-sm"
             >
-              {t('cancel')}
+              {t('cancelVisit')}
             </button>
             <button 
               onClick={handleAuth}

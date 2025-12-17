@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { translateForRequest } from '@/lib/translations'
 
 const prisma = new PrismaClient()
 
@@ -14,7 +15,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse<{ succe
     const days = daysParam ? parseInt(daysParam) : 30 // 默认删除30天前的日志
 
     if (days < 1) {
-      return NextResponse.json({ error: '天数必须大于0' }, { status: 400 })
+      return NextResponse.json({ error: translateForRequest(request, 'invalidRequestParams') }, { status: 400 })
     }
 
     // 计算截止日期
@@ -37,6 +38,6 @@ export async function DELETE(request: NextRequest): Promise<NextResponse<{ succe
 
   } catch (error) {
     console.error('清理日志失败:', error)
-    return NextResponse.json({ error: '清理日志失败' }, { status: 500 })
+    return NextResponse.json({ error: translateForRequest(request, 'serverError') }, { status: 500 })
   }
 }

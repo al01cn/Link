@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db'
 import { decryptPassword, encryptPassword } from '@/lib/crypto'
 import { verifyAdminToken } from '@/lib/adminAuth'
 import { isValidUUID, isValidUrl, fetchPageTitle, extractDomain, checkDomainAccessServer } from '@/lib/utils'
+import { translateForRequest } from '@/lib/translations'
 
 // 获取单个短链信息（包括密码）
 export async function GET(
@@ -14,13 +15,13 @@ export async function GET(
     
     // 验证UUID格式
     if (!isValidUUID(id)) {
-      return NextResponse.json({ error: '无效的ID格式' }, { status: 400 })
+      return NextResponse.json({ error: translateForRequest(request, 'apiInvalidId') }, { status: 400 })
     }
 
     // 检查管理员权限
     const adminPayload = verifyAdminToken(request)
     if (!adminPayload) {
-      return NextResponse.json({ error: '需要管理员权限' }, { status: 401 })
+      return NextResponse.json({ error: translateForRequest(request, 'apiAdminRequired') }, { status: 401 })
     }
 
     const link = await prisma.shortLink.findUnique({
@@ -28,7 +29,7 @@ export async function GET(
     })
 
     if (!link) {
-      return NextResponse.json({ error: '短链不存在' }, { status: 404 })
+      return NextResponse.json({ error: translateForRequest(request, 'apiLinkNotFound') }, { status: 404 })
     }
 
     // 解密密码（如果有的话）
@@ -41,7 +42,7 @@ export async function GET(
     })
   } catch (error) {
     console.error('获取短链信息失败:', error)
-    return NextResponse.json({ error: '服务器错误' }, { status: 500 })
+    return NextResponse.json({ error: translateForRequest(request, 'serverError') }, { status: 500 })
   }
 }
 
@@ -55,7 +56,7 @@ export async function PUT(
     
     // 验证UUID格式
     if (!isValidUUID(id)) {
-      return NextResponse.json({ error: '无效的ID格式' }, { status: 400 })
+      return NextResponse.json({ error: translateForRequest(request, 'apiInvalidId') }, { status: 400 })
     }
 
     const body = await request.json()
@@ -70,19 +71,19 @@ export async function PUT(
 
     // 验证URL
     if (!isValidUrl(originalUrl)) {
-      return NextResponse.json({ error: '无效的URL格式' }, { status: 400 })
+      return NextResponse.json({ error: translateForRequest(request, 'invalidUrlFormat') }, { status: 400 })
     }
 
     // 验证自定义路径
     if (customPath) {
       if (!/^[a-zA-Z0-9_-]+$/.test(customPath)) {
-        return NextResponse.json({ error: '路径只能包含字母、数字、下划线和连字符' }, { status: 400 })
+        return NextResponse.json({ error: translateForRequest(request, 'pathOnlyLettersNumbers') }, { status: 400 })
       }
       if (customPath.length < 3) {
-        return NextResponse.json({ error: '路径长度至少3个字符' }, { status: 400 })
+        return NextResponse.json({ error: translateForRequest(request, 'pathMinLength') }, { status: 400 })
       }
       if (customPath.length > 50) {
-        return NextResponse.json({ error: '路径长度不能超过50个字符' }, { status: 400 })
+        return NextResponse.json({ error: translateForRequest(request, 'pathMaxLength') }, { status: 400 })
       }
     }
 
@@ -104,7 +105,7 @@ export async function PUT(
       const accessCheck = await checkDomainAccessServer(domain, securityMode, domainRules)
       if (!accessCheck.allowed) {
         return NextResponse.json({ 
-          error: `无法更新短链：${accessCheck.reason}` 
+          error: translateForRequest(request, 'apiDomainAccessForbidden')
         }, { status: 403 })
       }
     }
@@ -115,7 +116,7 @@ export async function PUT(
     })
 
     if (!existingLink) {
-      return NextResponse.json({ error: '短链不存在' }, { status: 404 })
+      return NextResponse.json({ error: translateForRequest(request, 'apiLinkNotFound') }, { status: 404 })
     }
 
     // 如果提供了自定义路径，检查是否与其他短链冲突
@@ -125,7 +126,7 @@ export async function PUT(
       })
       
       if (pathExists) {
-        return NextResponse.json({ error: '自定义路径已存在' }, { status: 400 })
+        return NextResponse.json({ error: translateForRequest(request, 'linkExists') }, { status: 400 })
       }
     }
 
@@ -172,7 +173,7 @@ export async function PUT(
 
   } catch (error) {
     console.error('更新短链失败:', error)
-    return NextResponse.json({ error: '服务器错误' }, { status: 500 })
+    return NextResponse.json({ error: translateForRequest(request, 'serverError') }, { status: 500 })
   }
 }
 
@@ -186,7 +187,7 @@ export async function DELETE(
     
     // 验证UUID格式
     if (!isValidUUID(id)) {
-      return NextResponse.json({ error: '无效的ID格式' }, { status: 400 })
+      return NextResponse.json({ error: translateForRequest(request, 'apiInvalidId') }, { status: 400 })
     }
 
     await prisma.shortLink.delete({
@@ -196,6 +197,6 @@ export async function DELETE(
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('删除短链失败:', error)
-    return NextResponse.json({ error: '服务器错误' }, { status: 500 })
+    return NextResponse.json({ error: translateForRequest(request, 'serverError') }, { status: 500 })
   }
 }

@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { isAdminLoggedIn, adminLogout } from './adminAuth'
+import { useLanguage } from './LanguageContext'
 
 interface AdminContextType {
   isAuthenticated: boolean
@@ -17,6 +18,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [username, setUsername] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const { t } = useLanguage()
 
   const checkAuth = () => {
     if (typeof window !== 'undefined') {
@@ -64,7 +66,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       <div className="min-h-screen bg-[--color-bg-surface] preview-grid flex items-center justify-center">
         <div className="cute-card max-w-md w-full p-8 text-center">
           <div className="w-8 h-8 border-2 border-[--color-primary]/30 border-t-[--color-primary] rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-500">正在验证身份...</p>
+          <p className="text-slate-500">{t('verifyingIdentity')}</p>
         </div>
       </div>
     )

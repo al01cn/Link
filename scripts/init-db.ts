@@ -17,7 +17,7 @@ async function main() {
     update: {},
     create: {
       key: 'security_mode',
-      value: 'whitelist'  // 默认使用白名单模式
+      value: 'blacklist'  // 默认使用黑名单模式
     }
   })
 
@@ -26,7 +26,7 @@ async function main() {
     update: {},
     create: {
       key: 'redirect_wait_time',
-      value: '5'
+      value: '3'
     }
   })
 

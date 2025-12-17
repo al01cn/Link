@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ShortLink - 简单安全的短链服务",
-  description: "简单、安全、强大的短链生成工具",
+  title: "ShortLink - Simple & Secure URL Shortener",
+  description: "Simple, secure, and powerful link shortening tool",
 };
 
 export default function RootLayout({

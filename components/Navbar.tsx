@@ -12,7 +12,7 @@ interface NavbarProps {
   currentView: string
   lang: string
   toggleLang: () => void
-  t: (key: TranslationKey) => string
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string
 }
 
 export default function Navbar({ onViewChange, currentView, lang, toggleLang, t }: NavbarProps) {
@@ -50,7 +50,7 @@ export default function Navbar({ onViewChange, currentView, lang, toggleLang, t 
         <button 
           onClick={() => setShowApiDocs(true)}
           className="cute-btn px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2 hover:bg-slate-100 text-slate-600"
-          title="API 文档"
+          title={t('apiDocumentation')}
         >
           <Book size={18} />
           API
@@ -59,10 +59,10 @@ export default function Navbar({ onViewChange, currentView, lang, toggleLang, t 
         <button 
           onClick={() => setShowLogs(true)}
           className="cute-btn px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2 hover:bg-slate-100 text-slate-600"
-          title="系统日志"
+          title={t('systemLogs')}
         >
           <Activity size={18} />
-          日志
+          {t('logs')}
         </button>
         
         <button 
