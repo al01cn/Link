@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { AlertTriangle, ExternalLink, Lock, Clock, AlertCircle, ArrowRight, Shield, Zap } from 'lucide-react'
 import { TranslationKey } from '@/lib/translations'
+import TurnstileWidget from './TurnstileWidget'
 
 interface SafeRedirectViewProps {
   targetUrl: string
@@ -10,7 +11,8 @@ interface SafeRedirectViewProps {
   hasPassword: boolean
   requireConfirm: boolean
   waitTime: number
-  onProceed: (password?: string) => void
+  captchaEnabled: boolean
+  onProceed: (password?: string, captchaToken?: string) => void
   onCancel: () => void
   t: (key: TranslationKey, params?: Record<string, string | number>) => string
 }
@@ -21,6 +23,7 @@ export default function SafeRedirectView({
   hasPassword, 
   requireConfirm, 
   waitTime,
+  captchaEnabled,
   onProceed, 
   onCancel,
   t
@@ -32,12 +35,16 @@ export default function SafeRedirectView({
   const [domainBlocked, setDomainBlocked] = useState(false)
   const [blockReason, setBlockReason] = useState('')
   const [blockCountdown, setBlockCountdown] = useState(5)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const [captchaError, setCaptchaError] = useState('')
+  const [showCaptcha, setShowCaptcha] = useState(false)
+  const [captchaVerified, setCaptchaVerified] = useState(false)
   
-  // 显示按钮的条件：需要密码 或 需要手动确认
+  // 显示按钮的条件：需要密码 或 需要手动确认（与人机验证无关）
   const showButtons = hasPassword || requireConfirm
   
-  // 启用倒计时的条件：不显示按钮时（自动模式）
-  const enableCountdown = !showButtons
+  // 启用倒计时的条件：不显示按钮时（自动模式）且人机验证已通过（如果启用）
+  const enableCountdown = !showButtons && (!captchaEnabled || captchaVerified)
 
   // 获取域名
   const getDomain = (url: string) => {
@@ -69,6 +76,9 @@ export default function SafeRedirectView({
   const getDescription = () => {
     if (domainBlocked) {
       return `${blockReason}，${blockCountdown} 秒后自动关闭...`
+    }
+    if (captchaEnabled && showCaptcha && !captchaVerified) {
+      return '请完成人机验证后继续...'
     }
     if (hasPassword) {
       return '确认密码后，将前往目标链接...'
@@ -118,6 +128,13 @@ export default function SafeRedirectView({
     // 检查域名访问权限
     checkDomainAccess()
   }, [])
+
+  // 监听 captchaEnabled 变化
+  useEffect(() => {
+    if (captchaEnabled) {
+      setShowCaptcha(true)
+    }
+  }, [captchaEnabled])
 
   // 检查域名访问权限
   const checkDomainAccess = async () => {
@@ -176,7 +193,38 @@ export default function SafeRedirectView({
       return
     }
     
-    onProceed(password)
+    if (captchaEnabled && showCaptcha && !captchaToken) {
+      setCaptchaError(t('captchaRequired'))
+      return
+    }
+    
+    onProceed(password, captchaToken)
+  }
+
+  // 处理人机验证成功
+  const handleCaptchaSuccess = (token: string) => {
+    setCaptchaToken(token)
+    setCaptchaError('')
+    setCaptchaVerified(true)
+    // 如果只需要人机验证（不需要密码和手动确认），验证通过后开始倒计时
+    if (captchaEnabled && !hasPassword && !requireConfirm) {
+      // 重置倒计时，开始自动跳转
+      setCountdown(waitTime)
+    }
+  }
+
+  // 处理人机验证失败
+  const handleCaptchaError = () => {
+    setCaptchaToken('')
+    setCaptchaError(t('captchaFailed'))
+    setCaptchaVerified(false)
+  }
+
+  // 处理人机验证过期
+  const handleCaptchaExpire = () => {
+    setCaptchaToken('')
+    setCaptchaError(t('captchaExpired'))
+    setCaptchaVerified(false)
   }
 
   return (
@@ -242,6 +290,24 @@ export default function SafeRedirectView({
           </div>
         )}
 
+        {/* 人机验证组件 */}
+        {!domainBlocked && captchaEnabled && !captchaVerified && (
+          <div className={`mb-6 ${isClient ? 'animate__animated animate__fadeIn' : ''}`}>
+            <TurnstileWidget
+              onVerify={handleCaptchaSuccess}
+              onError={handleCaptchaError}
+              onExpire={handleCaptchaExpire}
+              className="mb-4"
+            />
+            {captchaError && (
+              <div className={`flex items-center gap-1 text-[var(--color-error)] text-xs mt-2 font-medium justify-center ${isClient ? 'animate__animated animate__headShake' : ''}`}>
+                <AlertCircle size={12} />
+                {captchaError}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 倒计时消息（仅自动跳转模式且域名未被拦截） */}
         {!domainBlocked && !showButtons && (
           <div className={`mb-4 text-sm text-slate-400 font-medium ${isClient ? 'animate__animated animate__pulse animate__infinite' : ''}`}>
@@ -261,7 +327,12 @@ export default function SafeRedirectView({
             </button>
             <button 
               onClick={handleAuth}
-              className="flex-1 shine-effect bg-[var(--color-primary)] text-white px-4 py-3 rounded-xl font-medium hover:bg-[var(--color-primary-hover)] transition-colors shadow-lg shadow-blue-200 text-sm flex items-center justify-center gap-2"
+              disabled={(hasPassword && !password) || (captchaEnabled && !captchaVerified)}
+              className={`flex-1 shine-effect text-white px-4 py-3 rounded-xl font-medium transition-colors shadow-lg shadow-blue-200 text-sm flex items-center justify-center gap-2 ${
+                (hasPassword && !password) || (captchaEnabled && !captchaVerified) 
+                  ? 'bg-slate-400 cursor-not-allowed' 
+                  : 'bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)]'
+              }`}
             >
               {hasPassword ? (
                 <>

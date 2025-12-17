@@ -10,6 +10,7 @@ import NotificationDialog from './NotificationDialog'
 interface SettingsData {
   mode: 'whitelist' | 'blacklist'
   waitTime: number
+  captchaEnabled: boolean
 }
 
 interface DomainRule {
@@ -55,7 +56,8 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
         const data = await response.json()
         setSettings({
           mode: data.securityMode,
-          waitTime: data.waitTime
+          waitTime: data.waitTime,
+          captchaEnabled: data.captchaEnabled || false
         })
         setDomainRules(data.domainRules)
       }
@@ -76,7 +78,8 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
         },
         body: JSON.stringify({
           securityMode: newSettings.mode,
-          waitTime: newSettings.waitTime
+          waitTime: newSettings.waitTime,
+          captchaEnabled: newSettings.captchaEnabled
         })
       })
       
@@ -282,6 +285,55 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
             </div>
           </div>
 
+          {/* 人机验证设置 */}
+          <div className={isClient ? 'animate__animated animate__fadeIn' : ''}>
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Shield size={16} />
+              {t('captchaSettings')}
+            </h3>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div 
+                className={`option-card p-4 rounded-xl cursor-pointer bg-slate-50 relative ${
+                  settings.captchaEnabled ? 'active ring-2 ring-[var(--color-primary)]' : 'hover:bg-slate-100'
+                }`}
+                onClick={() => {
+                  const newSettings = {...settings, captchaEnabled: true}
+                  saveSettings(newSettings)
+                }}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                    settings.captchaEnabled ? 'border-[var(--color-primary)] bg-[var(--color-primary)]' : 'border-slate-300'
+                  }`}>
+                    {settings.captchaEnabled && <Check size={12} className="text-white" />}
+                  </div>
+                  <span className="font-bold text-slate-700">{t('enableCaptcha')}</span>
+                </div>
+                <p className="text-xs text-slate-500 pl-8">{t('captchaDesc')}</p>
+              </div>
+
+              <div 
+                className={`option-card p-4 rounded-xl cursor-pointer bg-slate-50 relative ${
+                  !settings.captchaEnabled ? 'active ring-2 ring-[var(--color-primary)]' : 'hover:bg-slate-100'
+                }`}
+                onClick={() => {
+                  const newSettings = {...settings, captchaEnabled: false}
+                  saveSettings(newSettings)
+                }}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                    !settings.captchaEnabled ? 'border-[var(--color-primary)] bg-[var(--color-primary)]' : 'border-slate-300'
+                  }`}>
+                    {!settings.captchaEnabled && <Check size={12} className="text-white" />}
+                  </div>
+                  <span className="font-bold text-slate-700">{t('disableCaptcha')}</span>
+                </div>
+                <p className="text-xs text-slate-500 pl-8">{t('captchaOffDesc')}</p>
+              </div>
+            </div>
+          </div>
+
           {/* 域名列表 */}
           <div className={isClient ? 'animate__animated animate__fadeIn' : ''}>
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">
@@ -365,24 +417,7 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
             </div>
           </div>
 
-          {/* 自动清理策略 */}
-          <div>
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">{t('autoCleanup')}</h3>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer">
-                <span className="text-slate-700">{t('cleanup30')}</span>
-                <div className="w-10 h-6 bg-[var(--color-primary)] rounded-full relative cursor-pointer">
-                  <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer">
-                <span className="text-slate-700">{t('cleanupExpired')}</span>
-                <div className="w-10 h-6 bg-[var(--color-primary)] rounded-full relative cursor-pointer">
-                  <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
-                </div>
-              </div>
-            </div>
-          </div>
+
         </div>
       </div>
 

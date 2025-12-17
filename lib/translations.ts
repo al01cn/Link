@@ -60,9 +60,18 @@ export const translations = {
     seconds: '秒',
     whitelistDomains: '白名单域名 (Whitelist)',
     blacklistDomains: '黑名单域名 (Blacklist)',
-    autoCleanup: '自动清理策略',
-    cleanup30: '清理 30 天未访问的短链',
-    cleanupExpired: '清理已过期的短链',
+    
+    // 人机验证设置
+    captchaSettings: '人机验证设置',
+    enableCaptcha: '启用人机验证',
+    disableCaptcha: '关闭人机验证',
+    captchaDesc: '开启后在跳转页面强制进行人机验证，提高安全性。',
+    captchaOffDesc: '关闭后仅在检测到风险时才显示人机验证。',
+    captchaVerification: '人机验证',
+    captchaRequired: '请完成人机验证',
+    captchaFailed: '人机验证失败，请重试',
+    captchaExpired: '人机验证已过期，请重新验证',
+
     add: '添加',
     
     // 错误信息
@@ -161,9 +170,18 @@ export const translations = {
     seconds: 's',
     whitelistDomains: 'Whitelist Domains',
     blacklistDomains: 'Blacklist Domains',
-    autoCleanup: 'Auto Cleanup Policy',
-    cleanup30: 'Clean up links inactive for 30 days',
-    cleanupExpired: 'Clean up expired links',
+    
+    // 人机验证设置
+    captchaSettings: 'CAPTCHA Settings',
+    enableCaptcha: 'Enable CAPTCHA',
+    disableCaptcha: 'Disable CAPTCHA',
+    captchaDesc: 'Force CAPTCHA verification on redirect pages for enhanced security.',
+    captchaOffDesc: 'Show CAPTCHA only when risk is detected.',
+    captchaVerification: 'CAPTCHA Verification',
+    captchaRequired: 'Please complete CAPTCHA verification',
+    captchaFailed: 'CAPTCHA verification failed, please try again',
+    captchaExpired: 'CAPTCHA verification expired, please verify again',
+
     add: 'Add',
     
     // 错误信息

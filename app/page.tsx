@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Navbar from '@/components/Navbar'
 import HomeView from '@/components/HomeView'
 import SafeRedirectView from '@/components/SafeRedirectView'
@@ -12,7 +12,7 @@ import { useNotificationDialog } from '@/lib/useDialog'
 import NotificationDialog from '@/components/NotificationDialog'
 
 interface ShortLink {
-  id: number
+  id: string // 改为UUID字符串类型
   path: string
   shortUrl: string
   originalUrl: string
@@ -31,13 +31,37 @@ function HomeContent() {
   const [lang, setLang] = useState<Language>('zh')
   const [settings, setSettings] = useState({
     mode: 'whitelist' as 'whitelist' | 'blacklist',
-    waitTime: 5
+    waitTime: 5,
+    captchaEnabled: false
   })
 
   const t = useTranslation(lang)
   
   // 通知对话框 hook
   const notificationDialog = useNotificationDialog()
+
+  // 加载系统设置
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const response = await fetch('/api/settings')
+        if (response.ok) {
+          const data = await response.json()
+          setSettings({
+            mode: data.securityMode || 'whitelist',
+            waitTime: data.waitTime || 5,
+            captchaEnabled: data.captchaEnabled || false
+          })
+        }
+      } catch (error) {
+        console.error('加载设置失败:', error)
+      }
+    }
+
+    if (isAuthenticated) {
+      loadSettings()
+    }
+  }, [isAuthenticated])
   
   // 如果未认证，显示登录页面
   if (!isAuthenticated) {
@@ -61,10 +85,30 @@ function HomeContent() {
   }
 
   // 处理跳转确认
-  const handleProceed = async (password?: string) => {
+  const handleProceed = async (password?: string, captchaToken?: string) => {
     if (!redirectTarget) return
 
     try {
+      // 如果启用了人机验证，先验证 captcha token
+      if (settings.captchaEnabled && captchaToken) {
+        const captchaResponse = await fetch('/api/verify-turnstile', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token: captchaToken })
+        })
+
+        if (!captchaResponse.ok) {
+          const captchaError = await captchaResponse.json()
+          notificationDialog.notify({
+            type: 'error',
+            message: captchaError.error || t('captchaFailed')
+          })
+          return
+        }
+      }
+
       const response = await fetch(`/api/visit/${redirectTarget.path}`, {
         method: 'POST',
         headers: {
@@ -129,6 +173,7 @@ function HomeContent() {
             hasPassword={redirectTarget.hasPassword}
             requireConfirm={redirectTarget.requireConfirm}
             waitTime={settings.waitTime}
+            captchaEnabled={settings.captchaEnabled}
             onProceed={handleProceed}
             onCancel={handleCancel}
             t={t}

@@ -30,7 +30,16 @@ export default function NotFound() {
         <div className="flex flex-col sm:flex-row gap-3">
           <Link 
             href="/"
-            className="flex-1 shine-effect bg-[--color-primary] text-white px-6 py-3 rounded-xl font-medium hover:bg-[--color-primary-hover] transition-colors shadow-lg shadow-blue-200 flex items-center justify-center gap-2"
+            className="flex-1 shine-effect bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-medium transition-colors shadow-lg shadow-blue-200 flex items-center justify-center gap-2"
+            style={{ 
+              backgroundColor: 'var(--color-primary)'
+            } as React.CSSProperties}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-primary)'
+            }}
           >
             <Home size={18} />
             {t('backHome')}

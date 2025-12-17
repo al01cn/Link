@@ -20,6 +20,7 @@
     "setup": "prisma generate && prisma db push && bun run db:init"
   },
   "dependencies": {
+    "@marsidev/react-turnstile": "^1.4.0",
     "@prisma/client": "5.22.0",
     "@types/crypto-js": "^4.2.2",
     "bcryptjs": "^3.0.3",

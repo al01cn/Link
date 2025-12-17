@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { AlertTriangle, ExternalLink, Lock, Clock, AlertCircle, ArrowRight, Shield, Zap } from 'lucide-react'
+import TurnstileWidget from '@/components/TurnstileWidget'
 
 interface SafeRedirectClientProps {
   path: string
@@ -28,12 +29,17 @@ export default function SafeRedirectClient({
   const [domainBlocked, setDomainBlocked] = useState(false)
   const [blockReason, setBlockReason] = useState('')
   const [blockCountdown, setBlockCountdown] = useState(5)
+  const [captchaEnabled, setCaptchaEnabled] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const [captchaError, setCaptchaError] = useState('')
+  const [showCaptcha, setShowCaptcha] = useState(false)
+  const [captchaVerified, setCaptchaVerified] = useState(false)
   
-  // 显示按钮的条件：需要密码 或 需要手动确认
+  // 显示按钮的条件：需要密码 或 需要手动确认（与人机验证无关）
   const showButtons = hasPassword || requireConfirm
   
-  // 启用倒计时的条件：启用过渡页且不显示按钮时（自动模式）
-  const enableCountdown = enableIntermediate && !showButtons
+  // 启用倒计时的条件：启用过渡页且不显示按钮时（自动模式）且人机验证已通过（如果启用）
+  const enableCountdown = enableIntermediate && !showButtons && (!captchaEnabled || captchaVerified)
 
   // 获取域名
   const getDomain = (url: string) => {
@@ -66,14 +72,17 @@ export default function SafeRedirectClient({
     if (domainBlocked) {
       return `${blockReason}，${blockCountdown} 秒后自动关闭...`
     }
+    if (captchaEnabled && showCaptcha && !captchaVerified) {
+      return '请完成人机验证后继续...'
+    }
     if (hasPassword) {
-      return '请确认密码后，前往目标链接...'
+      return '确认密码后，将前往目标链接...'
     }
     if (requireConfirm) {
       return '点击确认后，前往目标链接。'
     }
     if (enableCountdown) {
-      return '正在前往目标链接，请等待...'
+      return '请耐心等待前往目标链接...'
     }
     return '正在前往目标链接...'
   }
@@ -114,10 +123,35 @@ export default function SafeRedirectClient({
   const handleProceed = useCallback(async (inputPassword?: string) => {
     if (isProcessing) return
     
+    // 检查人机验证
+    if (captchaEnabled && showCaptcha && !captchaVerified) {
+      setCaptchaError('请完成人机验证')
+      return
+    }
+    
     setIsProcessing(true)
     setError('')
+    setCaptchaError('')
 
     try {
+      // 如果启用了人机验证，先验证 captcha token
+      if (captchaEnabled && captchaToken) {
+        const captchaResponse = await fetch('/api/verify-turnstile', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token: captchaToken })
+        })
+
+        if (!captchaResponse.ok) {
+          const captchaErrorData = await captchaResponse.json()
+          setCaptchaError(captchaErrorData.error || '人机验证失败，请重试')
+          setIsProcessing(false)
+          return
+        }
+      }
+
       const response = await fetch(`/api/visit/${path}`, {
         method: 'POST',
         headers: {
@@ -149,7 +183,27 @@ export default function SafeRedirectClient({
     setIsClient(true)
     // 检查域名访问权限
     checkDomainAccess()
+    // 加载系统设置
+    loadSystemSettings()
   }, [])
+
+  // 加载系统设置
+  const loadSystemSettings = async () => {
+    try {
+      const response = await fetch('/api/settings')
+      if (response.ok) {
+        const data = await response.json()
+        setCaptchaEnabled(data.captchaEnabled || false)
+        if (data.captchaEnabled) {
+          setShowCaptcha(true)
+        }
+        // 更新倒计时时间
+        setCountdown(data.waitTime || 5)
+      }
+    } catch (error) {
+      console.error('加载系统设置失败:', error)
+    }
+  }
 
   // 检查域名访问权限
   const checkDomainAccess = async () => {
@@ -204,6 +258,32 @@ export default function SafeRedirectClient({
 
   const handleCancel = () => {
     window.history.back()
+  }
+
+  // 处理人机验证成功
+  const handleCaptchaSuccess = (token: string) => {
+    setCaptchaToken(token)
+    setCaptchaError('')
+    setCaptchaVerified(true)
+    // 如果只需要人机验证（不需要密码和手动确认），验证通过后开始倒计时
+    if (captchaEnabled && !hasPassword && !requireConfirm && enableIntermediate) {
+      // 重置倒计时，开始自动跳转
+      setCountdown(5) // 使用默认倒计时时间
+    }
+  }
+
+  // 处理人机验证失败
+  const handleCaptchaError = () => {
+    setCaptchaToken('')
+    setCaptchaError('人机验证失败，请重试')
+    setCaptchaVerified(false)
+  }
+
+  // 处理人机验证过期
+  const handleCaptchaExpire = () => {
+    setCaptchaToken('')
+    setCaptchaError('人机验证已过期，请重新验证')
+    setCaptchaVerified(false)
   }
 
   return (
@@ -271,6 +351,24 @@ export default function SafeRedirectClient({
             </div>
           )}
 
+          {/* 人机验证组件 */}
+          {!domainBlocked && captchaEnabled && !captchaVerified && (
+            <div className={`mb-6 ${isClient ? 'animate-fade-in' : ''}`}>
+              <TurnstileWidget
+                onVerify={handleCaptchaSuccess}
+                onError={handleCaptchaError}
+                onExpire={handleCaptchaExpire}
+                className="mb-4"
+              />
+              {captchaError && (
+                <div className={`flex items-center gap-1 text-[--color-error] text-xs mt-2 font-medium justify-center ${isClient ? 'animate-fade-in' : ''}`}>
+                  <AlertCircle size={12} />
+                  {captchaError}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* 倒计时消息（仅自动跳转模式且域名未被拦截） */}
           {!domainBlocked && enableCountdown && !isProcessing && (
             <div className={`mb-4 text-sm text-slate-400 font-medium ${isClient ? 'animate-fade-in' : ''}`}>
@@ -298,9 +396,11 @@ export default function SafeRedirectClient({
               </button>
               <button 
                 onClick={() => handleProceed()}
-                disabled={hasPassword && !password}
-                className={`flex-1 shine-effect bg-[--color-primary] text-white px-4 py-3 rounded-xl font-medium hover:bg-[--color-primary-hover] transition-colors shadow-lg shadow-blue-200 text-sm flex items-center justify-center gap-2 ${
-                  hasPassword && !password ? 'opacity-50 cursor-not-allowed' : ''
+                disabled={(hasPassword && !password) || (captchaEnabled && !captchaVerified)}
+                className={`flex-1 shine-effect text-white px-4 py-3 rounded-xl font-medium transition-colors shadow-lg shadow-blue-200 text-sm flex items-center justify-center gap-2 ${
+                  (hasPassword && !password) || (captchaEnabled && !captchaVerified) 
+                    ? 'bg-slate-400 cursor-not-allowed' 
+                    : 'bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)]'
                 }`}
               >
                 {hasPassword ? (

@@ -10,7 +10,7 @@ datasource db {
 
 // 短链模型
 model ShortLink {
-  id           Int      @id @default(autoincrement())
+  id           String   @id @default(uuid()) // 使用UUID作为主键
   path         String   @unique // 短链路径，如 "abc123"
   originalUrl  String   // 原始长链接
   title        String?  // 页面标题（自动抓取）
@@ -32,8 +32,8 @@ model ShortLink {
 
 // 访问日志模型
 model VisitLog {
-  id        Int      @id @default(autoincrement())
-  shortId   Int
+  id        String   @id @default(uuid()) // 使用UUID作为主键
+  shortId   String   // 关联短链的UUID
   ip        String?
   userAgent String?
   referer   String?
@@ -59,10 +59,21 @@ model DomainRule {
 
 // 管理员账户模型
 model Admin {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(uuid()) // 使用UUID作为主键
   username  String   @unique
   password  String   // 加密后的密码
   isDefault Boolean  @default(false) // 是否为默认账户
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// 系统日志模型
+model Log {
+  id        String   @id @default(uuid()) // 使用UUID作为主键
+  type      String   // 日志类型: "visit" | "create" | "error"
+  message   String   // 日志消息
+  details   String?  // 详细信息（JSON字符串）
+  ip        String?  // 客户端IP
+  userAgent String?  // 用户代理
+  createdAt DateTime @default(now())
 }

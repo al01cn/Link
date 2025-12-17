@@ -2,19 +2,48 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { AlertTriangle, ExternalLink, Clock, ArrowRight } from 'lucide-react'
+import { AlertTriangle, ExternalLink, Clock, ArrowRight, Shield, Zap, AlertCircle } from 'lucide-react'
 import { isValidUrl } from '@/lib/utils'
 import { useTranslation } from '@/lib/translations'
+import TurnstileWidget from '@/components/TurnstileWidget'
+
+// 跳转类型枚举
+type RedirectType = 'href' | 'auto' | 'confirm'
+
+// Token 配置接口
+interface TokenConfig {
+  url: string
+  type?: RedirectType
+  title?: string
+  msg?: string
+  turnstile?: boolean
+}
+
+// API 响应接口
+interface ToApiResponse {
+  originalUrl: string
+  title: string
+  type: RedirectType
+  enableIntermediate: boolean
+  msg: string
+  captchaEnabled: boolean
+}
 
 function ToPageContent() {
   const t = useTranslation('zh') // 默认中文，实际项目中可以从context获取
   const searchParams = useSearchParams()
   const [targetUrl, setTargetUrl] = useState('')
   const [title, setTitle] = useState('')
+  const [message, setMessage] = useState('正在前往目标链接...')
   const [countdown, setCountdown] = useState(5)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isClient, setIsClient] = useState(false)
+  const [redirectType, setRedirectType] = useState<RedirectType>('auto')
+  const [captchaEnabled, setCaptchaEnabled] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const [captchaError, setCaptchaError] = useState('')
+  const [captchaVerified, setCaptchaVerified] = useState(false)
 
   // 客户端水合完成后启用动画
   useEffect(() => {
@@ -22,55 +51,112 @@ function ToPageContent() {
   }, [])
 
   useEffect(() => {
+    const token = searchParams.get('token')
     const url = searchParams.get('url')
+    const type = searchParams.get('type')
     
-    if (!url) {
-      setError('缺少目标URL参数') // 这个错误信息可以保持中文，因为是技术错误
+    // 没有任何参数
+    if (!token && !url) {
+      setError('缺少目标URL参数或token参数')
       setIsLoading(false)
       return
     }
 
-    if (!isValidUrl(url)) {
-      setError('无效的URL格式') // 这个错误信息可以保持中文，因为是技术错误
-      setIsLoading(false)
-      return
-    }
-
-    setTargetUrl(url)
-    fetchUrlInfo(url)
+    // 使用 API 接口获取配置
+    fetchToConfig(token, url, type)
   }, [searchParams])
 
   useEffect(() => {
-    if (countdown > 0 && targetUrl && !error) {
+    // 只有在自动跳转模式且已获取到链接信息且人机验证已通过（如果启用）时才启动倒计时
+    const canStartCountdown = countdown > 0 && targetUrl && !error && !isLoading && 
+                             redirectType === 'auto' && (!captchaEnabled || captchaVerified)
+    
+    if (canStartCountdown) {
       const timer = setInterval(() => {
         setCountdown(prev => prev - 1)
       }, 1000)
       return () => clearInterval(timer)
-    } else if (countdown === 0 && targetUrl) {
+    } else if (countdown === 0 && targetUrl && redirectType === 'auto' && (!captchaEnabled || captchaVerified)) {
       handleProceed()
     }
-  }, [countdown, targetUrl, error])
+  }, [countdown, targetUrl, error, isLoading, redirectType, captchaEnabled, captchaVerified])
 
-  const fetchUrlInfo = async (url: string) => {
+  const fetchToConfig = async (token?: string | null, url?: string | null, type?: string | null) => {
     try {
-      const response = await fetch(`/api/to?url=${encodeURIComponent(url)}`)
+      // 构建 API 请求 URL
+      const params = new URLSearchParams()
+      if (token) {
+        params.append('token', token)
+      }
+      if (url) {
+        params.append('url', url)
+      }
+      if (type) {
+        params.append('type', type)
+      }
+
+      const response = await fetch(`/api/to?${params.toString()}`)
       
       if (response.ok) {
-        const data = await response.json()
-        setTitle(data.title || t('targetUrl'))
+        const data: ToApiResponse = await response.json()
+        
+        // 设置所有配置
+        setTargetUrl(data.originalUrl)
+        setTitle(data.title)
+        setMessage(data.msg)
+        setRedirectType(data.type)
+        setCaptchaEnabled(data.captchaEnabled)
+
+        // href 模式直接跳转
+        if (data.type === 'href') {
+          setIsLoading(false)
+          handleProceed()
+          return
+        }
+        
+        setIsLoading(false)
       } else {
         const errorData = await response.json()
-        setError(errorData.error || '获取链接信息失败')
+        setError(errorData.error || '获取链接配置失败')
+        setIsLoading(false)
       }
     } catch (error) {
-      console.error('获取链接信息失败:', error)
-      setTitle('外部链接')
-    } finally {
+      console.error('获取链接配置失败:', error)
+      setError('网络错误，请重试')
       setIsLoading(false)
     }
   }
 
-  const handleProceed = () => {
+  const handleProceed = async () => {
+    // 如果启用了人机验证但未验证，阻止跳转
+    if (captchaEnabled && !captchaVerified) {
+      setCaptchaError('请完成人机验证')
+      return
+    }
+
+    // 如果启用了人机验证，先验证 token
+    if (captchaEnabled && captchaToken) {
+      try {
+        const response = await fetch('/api/verify-turnstile', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token: captchaToken })
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          setCaptchaError(errorData.error || '人机验证失败，请重试')
+          return
+        }
+      } catch (error) {
+        console.error('人机验证失败:', error)
+        setCaptchaError('验证服务异常，请重试')
+        return
+      }
+    }
+
     if (targetUrl) {
       window.location.href = targetUrl
     }
@@ -80,7 +166,69 @@ function ToPageContent() {
     window.history.back()
   }
 
-  if (isLoading) {
+  // 处理人机验证成功
+  const handleCaptchaSuccess = (token: string) => {
+    setCaptchaToken(token)
+    setCaptchaError('')
+    setCaptchaVerified(true)
+    // 如果是自动跳转模式，验证通过后重置倒计时
+    if (redirectType === 'auto') {
+      setCountdown(5)
+    }
+  }
+
+  // 处理人机验证失败
+  const handleCaptchaError = () => {
+    setCaptchaToken('')
+    setCaptchaError('人机验证失败，请重试')
+    setCaptchaVerified(false)
+  }
+
+  // 处理人机验证过期
+  const handleCaptchaExpire = () => {
+    setCaptchaToken('')
+    setCaptchaError('人机验证已过期，请重新验证')
+    setCaptchaVerified(false)
+  }
+
+  // 获取显示标题
+  const getDisplayTitle = () => {
+    if (title) {
+      return title.length > 30 ? title.substring(0, 30) + '...' : title
+    }
+    try {
+      return new URL(targetUrl).hostname
+    } catch {
+      return '外部链接'
+    }
+  }
+
+  // 获取图标和颜色
+  const getIconAndColor = () => {
+    switch (redirectType) {
+      case 'href':
+        return { 
+          icon: ExternalLink, 
+          color: 'text-purple-600',
+          bgColor: 'bg-purple-100'
+        }
+      case 'confirm':
+        return { 
+          icon: Shield, 
+          color: 'text-[var(--color-success)]',
+          bgColor: 'bg-green-100'
+        }
+      case 'auto':
+      default:
+        return { 
+          icon: Zap, 
+          color: 'text-[var(--color-primary)]',
+          bgColor: 'bg-blue-100'
+        }
+    }
+  }
+
+  if (isLoading && redirectType !== 'href') {
     return (
       <div className="min-h-screen bg-[--color-bg-surface] preview-grid flex items-center justify-center">
         <div className="cute-card max-w-md w-full p-8 text-center">
@@ -115,18 +263,26 @@ function ToPageContent() {
     <div className="min-h-screen bg-[--color-bg-surface] preview-grid">
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className={`cute-card max-w-md w-full p-8 text-center ${isClient ? 'animate-fade-in' : ''}`}>
-          <div className="w-16 h-16 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-6 relative">
-            <AlertTriangle size={32} />
-            {countdown > 0 && (
-              <div className="absolute -top-2 -right-2 bg-[--color-primary] text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center border-2 border-white">
+          <div className={`w-16 h-16 ${getIconAndColor().bgColor} ${getIconAndColor().color} rounded-full flex items-center justify-center mx-auto mb-6 relative`}>
+            {(() => {
+              const IconComponent = getIconAndColor().icon
+              return <IconComponent size={32} />
+            })()}
+            {countdown > 0 && redirectType === 'auto' && (
+              <div 
+                className="absolute -top-2 -right-2 bg-blue-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center border-2 border-white"
+                style={{ backgroundColor: 'var(--color-primary)' }}
+              >
                 {countdown}
               </div>
             )}
           </div>
           
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">即将离开 ShortLink</h2>
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">
+            {getDisplayTitle()}
+          </h2>
           <p className="text-slate-500 mb-6 text-sm leading-relaxed">
-            正在前往外部链接，请确认链接安全性。
+            {message}
           </p>
 
           <div className="bg-slate-50 rounded-xl p-4 mb-6 text-left border border-slate-100 relative overflow-hidden group">
@@ -143,29 +299,54 @@ function ToPageContent() {
             )}
           </div>
 
-          {/* 倒计时消息 */}
-          {countdown > 0 && (
+          {/* 人机验证组件 */}
+          {captchaEnabled && !captchaVerified && (
+            <div className={`mb-6 ${isClient ? 'animate-fade-in' : ''}`}>
+              <TurnstileWidget
+                onVerify={handleCaptchaSuccess}
+                onError={handleCaptchaError}
+                onExpire={handleCaptchaExpire}
+                className="mb-4"
+              />
+              {captchaError && (
+                <div className={`flex items-center gap-1 text-red-500 text-xs mt-2 font-medium justify-center ${isClient ? 'animate-fade-in' : ''}`}>
+                  <AlertCircle size={12} />
+                  {captchaError}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 倒计时消息（仅自动跳转模式且人机验证已通过） */}
+          {countdown > 0 && redirectType === 'auto' && (!captchaEnabled || captchaVerified) && (
             <div className={`mb-4 text-sm text-slate-400 font-medium ${isClient ? 'animate-fade-in' : ''}`}>
               <Clock size={14} className="inline mr-1 relative -top-px" />
               将在 {countdown} 秒后自动跳转...
             </div>
           )}
 
-          {/* 操作按钮 */}
-          <div className={`flex gap-3 ${isClient ? 'animate-fade-in' : ''}`}>
-            <button 
-              onClick={handleCancel}
-              className="flex-1 px-4 py-3 rounded-xl font-medium text-slate-600 hover:bg-slate-100 transition-colors text-sm"
-            >
-              取消访问
-            </button>
-            <button 
-              onClick={handleProceed}
-              className="flex-1 shine-effect bg-[--color-primary] text-white px-4 py-3 rounded-xl font-medium hover:bg-[--color-primary-hover] transition-colors shadow-lg shadow-blue-200 text-sm flex items-center justify-center gap-2"
-            >
-              立即跳转 <ArrowRight size={16} />
-            </button>
-          </div>
+          {/* 操作按钮（确认模式或人机验证未完成时显示按钮） */}
+          {(redirectType !== 'auto' || (captchaEnabled && !captchaVerified)) && (
+            <div className={`flex gap-3 ${isClient ? 'animate-fade-in' : ''}`}>
+              <button 
+                onClick={handleCancel}
+                className="flex-1 px-4 py-3 rounded-xl font-medium text-slate-600 hover:bg-slate-100 transition-colors text-sm"
+              >
+                取消访问
+              </button>
+              <button 
+                onClick={handleProceed}
+                disabled={captchaEnabled && !captchaVerified}
+                className={`flex-1 shine-effect text-white px-4 py-3 rounded-xl font-medium transition-colors shadow-lg shadow-blue-200 text-sm flex items-center justify-center gap-2 ${
+                  captchaEnabled && !captchaVerified 
+                    ? 'bg-slate-400 cursor-not-allowed' 
+                    : 'bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)]'
+                }`}
+              >
+                {redirectType === 'href' ? '直接跳转' : '确认跳转'} <ArrowRight size={16} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

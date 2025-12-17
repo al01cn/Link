@@ -14,6 +14,11 @@ export async function GET() {
       where: { key: 'redirect_wait_time' }
     })
     
+    // 获取人机验证开关设置
+    const captchaEnabled = await prisma.setting.findUnique({
+      where: { key: 'captcha_enabled' }
+    })
+    
     // 获取域名规则
     const domainRules = await prisma.domainRule.findMany({
       where: { active: true },
@@ -23,6 +28,7 @@ export async function GET() {
     return NextResponse.json({
       securityMode: securityMode?.value || 'whitelist',
       waitTime: parseInt(waitTime?.value || '5'),
+      captchaEnabled: captchaEnabled?.value === 'true',
       domainRules
     })
   } catch (error) {
@@ -35,7 +41,7 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { securityMode, waitTime } = body
+    const { securityMode, waitTime, captchaEnabled } = body
     
     // 更新安全模式
     if (securityMode) {
@@ -52,6 +58,15 @@ export async function PUT(request: NextRequest) {
         where: { key: 'redirect_wait_time' },
         update: { value: waitTime.toString() },
         create: { key: 'redirect_wait_time', value: waitTime.toString() }
+      })
+    }
+    
+    // 更新人机验证开关
+    if (captchaEnabled !== undefined) {
+      await prisma.setting.upsert({
+        where: { key: 'captcha_enabled' },
+        update: { value: captchaEnabled.toString() },
+        create: { key: 'captcha_enabled', value: captchaEnabled.toString() }
       })
     }
     

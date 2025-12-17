@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { generateShortPath, isValidUrl, fetchPageTitle, extractDomain, checkDomainAccessServer } from '@/lib/utils'
 import { encryptPassword } from '@/lib/crypto'
+import { logCreate, logError } from '@/lib/logger'
 
 // 创建短链
 export async function POST(request: NextRequest) {
@@ -19,6 +20,19 @@ export async function POST(request: NextRequest) {
     // 验证URL
     if (!isValidUrl(originalUrl)) {
       return NextResponse.json({ error: '无效的URL格式' }, { status: 400 })
+    }
+
+    // 验证自定义路径
+    if (customPath) {
+      if (!/^[a-zA-Z0-9_-]+$/.test(customPath)) {
+        return NextResponse.json({ error: '路径只能包含字母、数字、下划线和连字符' }, { status: 400 })
+      }
+      if (customPath.length < 3) {
+        return NextResponse.json({ error: '路径长度至少3个字符' }, { status: 400 })
+      }
+      if (customPath.length > 50) {
+        return NextResponse.json({ error: '路径长度不能超过50个字符' }, { status: 400 })
+      }
     }
 
     // 检查域名访问权限
@@ -42,6 +56,22 @@ export async function POST(request: NextRequest) {
           error: `无法创建短链：${accessCheck.reason}` 
         }, { status: 403 })
       }
+    }
+
+    // 检查是否已存在相同的原始URL（防止重复创建）
+    const existingUrl = await prisma.shortLink.findFirst({
+      where: { originalUrl }
+    })
+    
+    if (existingUrl) {
+      return NextResponse.json({ 
+        error: '该链接已存在短链',
+        existingLink: {
+          id: existingUrl.id,
+          path: existingUrl.path,
+          shortUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/${existingUrl.path}`
+        }
+      }, { status: 409 })
     }
 
     // 生成或使用自定义路径
@@ -79,6 +109,15 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // 记录创建日志
+    await logCreate(shortLink.path, originalUrl, request, {
+      shortLinkId: shortLink.id,
+      title,
+      hasPassword: !!password,
+      requireConfirm,
+      enableIntermediate
+    })
+
     return NextResponse.json({
       id: shortLink.id,
       path: shortLink.path,
@@ -94,6 +133,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('创建短链失败:', error)
+    await logError('创建短链失败', error, request)
     return NextResponse.json({ error: '服务器错误' }, { status: 500 })
   }
 }

@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken'
 import { NextRequest } from 'next/server'
 
 export interface AdminPayload {
-  adminId: number
+  adminId: string // 改为UUID字符串类型
   username: string
 }
 

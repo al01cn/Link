@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyPassword } from '@/lib/crypto'
+import { logVisit, logError } from '@/lib/logger'
 
 // 访问短链 - 获取链接信息
 export async function GET(
@@ -90,6 +91,13 @@ export async function POST(
           userAgent,
           referer
         }
+      }),
+      // 记录系统日志
+      logVisit(path, shortLink.originalUrl, request, {
+        shortLinkId: shortLink.id,
+        title: shortLink.title,
+        hasPassword: !!shortLink.password,
+        referer
       })
     ])
 
@@ -100,6 +108,7 @@ export async function POST(
 
   } catch (error) {
     console.error('处理短链访问失败:', error)
+    await logError('处理短链访问失败', error, request)
     return NextResponse.json({ error: '服务器错误' }, { status: 500 })
   }
 }

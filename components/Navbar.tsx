@@ -1,7 +1,10 @@
 'use client'
 
-import { Link2, Settings, Globe } from 'lucide-react'
+import { Link2, Settings, Globe, Book, Activity } from 'lucide-react'
+import { useState } from 'react'
 import AdminDropdown from './AdminDropdown'
+import ApiDocumentation from './ApiDocumentation'
+import LogsView from './LogsView'
 import { TranslationKey } from '@/lib/translations'
 
 interface NavbarProps {
@@ -13,13 +16,19 @@ interface NavbarProps {
 }
 
 export default function Navbar({ onViewChange, currentView, lang, toggleLang, t }: NavbarProps) {
+  const [showApiDocs, setShowApiDocs] = useState(false)
+  const [showLogs, setShowLogs] = useState(false)
+
   return (
+    <>
+      <ApiDocumentation isOpen={showApiDocs} onClose={() => setShowApiDocs(false)} />
+      <LogsView isOpen={showLogs} onClose={() => setShowLogs(false)} />
     <nav className="flex items-center justify-between px-6 py-4 max-w-5xl mx-auto w-full z-10 relative">
       <div 
         className="flex items-center gap-2 cursor-pointer" 
         onClick={() => onViewChange('home')}
       >
-        <div className="w-8 h-8 bg-[var(--color-primary)] rounded-lg flex items-center justify-center text-white font-bold shine-effect shadow-lg">
+        <div className="w-8 h-8 bg-(--color-primary) rounded-lg flex items-center justify-center text-white font-bold shine-effect shadow-lg">
           <Link2 size={20} />
         </div>
         <span className="font-bold text-xl tracking-tight text-slate-800">{t('appTitle')}</span>
@@ -37,6 +46,24 @@ export default function Navbar({ onViewChange, currentView, lang, toggleLang, t 
             {lang.toUpperCase()}
           </span>
         </button>
+
+        <button 
+          onClick={() => setShowApiDocs(true)}
+          className="cute-btn px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2 hover:bg-slate-100 text-slate-600"
+          title="API 文档"
+        >
+          <Book size={18} />
+          API
+        </button>
+
+        <button 
+          onClick={() => setShowLogs(true)}
+          className="cute-btn px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2 hover:bg-slate-100 text-slate-600"
+          title="系统日志"
+        >
+          <Activity size={18} />
+          日志
+        </button>
         
         <button 
           onClick={() => onViewChange('settings')}
@@ -51,5 +78,6 @@ export default function Navbar({ onViewChange, currentView, lang, toggleLang, t 
         <AdminDropdown />
       </div>
     </nav>
+    </>
   )
 }

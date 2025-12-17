@@ -1,16 +1,17 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { Link2, ArrowRight, Settings, ChevronDown, Lock, Shield, Zap, Eye, Copy, Trash2, X } from 'lucide-react'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { Link2, ArrowRight, Settings, ChevronDown, Lock, Shield, Zap, Eye, Copy, Trash2, X, Search, Filter, Calendar, SortAsc, SortDesc, MousePointer, ExternalLink, Edit } from 'lucide-react'
 import { formatTimeAgo } from '@/lib/utils'
 import { TranslationKey } from '@/lib/translations'
 import { useConfirmDialog, useNotificationDialog } from '@/lib/useDialog'
 import ConfirmDialog from './ConfirmDialog'
 import NotificationDialog from './NotificationDialog'
+import EditPanel from './EditPanel'
 // 动态导入dialog-polyfill避免SSR问题
 
 interface ShortLink {
-  id: number
+  id: string // 改为UUID字符串类型
   path: string
   shortUrl: string
   originalUrl: string
@@ -35,6 +36,12 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
   const [copySuccess, setCopySuccess] = useState<string | null>(null)
   const [isClient, setIsClient] = useState(false)
   
+  // 搜索和筛选状态
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterType, setFilterType] = useState<'all' | 'password' | 'confirm' | 'auto' | 'direct'>('all')
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'views' | 'title'>('newest')
+  const [showFilters, setShowFilters] = useState(false)
+  
   // 对话框 hooks
   const confirmDialog = useConfirmDialog()
   const notificationDialog = useNotificationDialog()
@@ -43,14 +50,18 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [currentPassword, setCurrentPassword] = useState('')
   const [loadingPassword, setLoadingPassword] = useState(false)
+  const [loadingPasswordId, setLoadingPasswordId] = useState<string | null>(null)
   
   // 管理员验证弹窗状态
   const [showAdminModal, setShowAdminModal] = useState(false)
-  const [currentLinkId, setCurrentLinkId] = useState<number | null>(null)
+  const [currentLinkId, setCurrentLinkId] = useState<string | null>(null)
   const [adminError, setAdminError] = useState('')
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false)
   const adminDialogRef = useRef<HTMLDialogElement>(null)
   const passwordDialogRef = useRef<HTMLDialogElement>(null)
+  
+  // 编辑展开状态
+  const [expandedEditId, setExpandedEditId] = useState<string | null>(null)
   
   // 检查管理员登录状态
   useEffect(() => {
@@ -97,8 +108,12 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
   // 高级选项状态
   const [customPath, setCustomPath] = useState('')
   const [password, setPassword] = useState('')
+  const [expiresAt, setExpiresAt] = useState('')
   const [requireConfirm, setRequireConfirm] = useState(false)
   const [enableIntermediate, setEnableIntermediate] = useState(true)
+  
+  // 表单验证状态
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
   // 处理密码变化，有密码时自动开启二次确认和中间页
   useEffect(() => {
@@ -150,8 +165,51 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
     }
   }
 
+  // 表单验证函数
+  const validateCreateForm = () => {
+    const errors: Record<string, string> = {}
+
+    // URL验证
+    if (!url.trim()) {
+      errors.url = '请输入链接地址'
+    } else {
+      try {
+        new URL(url)
+      } catch {
+        errors.url = '请输入有效的URL格式'
+      }
+    }
+
+    // 自定义路径验证
+    if (customPath.trim()) {
+      if (!/^[a-zA-Z0-9_-]+$/.test(customPath)) {
+        errors.customPath = '路径只能包含字母、数字、下划线和连字符'
+      } else if (customPath.length < 3) {
+        errors.customPath = '路径长度至少3个字符'
+      } else if (customPath.length > 50) {
+        errors.customPath = '路径长度不能超过50个字符'
+      }
+    }
+
+    // 密码验证
+    if (password.trim() && password.length < 4) {
+      errors.password = '密码长度至少4个字符'
+    }
+
+    // 过期时间验证
+    if (expiresAt) {
+      const expireDate = new Date(expiresAt)
+      if (expireDate <= new Date()) {
+        errors.expiresAt = '过期时间必须晚于当前时间'
+      }
+    }
+
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
   const generateLink = async () => {
-    if (!url) return
+    if (!url || !validateCreateForm()) return
     
     setIsGenerating(true)
     
@@ -165,6 +223,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
           originalUrl: url,
           customPath: customPath || undefined,
           password: password || undefined,
+          expiresAt: expiresAt || undefined,
           requireConfirm,
           enableIntermediate
         })
@@ -178,15 +237,33 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
         setUrl('')
         setCustomPath('')
         setPassword('')
+        setExpiresAt('')
         setRequireConfirm(false)
         setEnableIntermediate(true)
         setShowAdvanced(false)
+        setFormErrors({})
       } else {
         const error = await response.json()
-        notificationDialog.notify({
-          type: 'error',
-          message: error.error || t('generateFailed')
-        })
+        
+        // 处理重复链接的情况
+        if (response.status === 409 && error.existingLink) {
+          const confirmed = await confirmDialog.confirm({
+            type: 'warning',
+            title: '链接已存在',
+            message: `该链接已存在短链：${error.existingLink.shortUrl}\n\n是否要复制现有短链？`,
+            confirmText: '复制链接',
+            cancelText: '取消'
+          })
+          
+          if (confirmed) {
+            copyToClipboard(error.existingLink.shortUrl, error.existingLink.id)
+          }
+        } else {
+          notificationDialog.notify({
+            type: 'error',
+            message: error.error || t('generateFailed')
+          })
+        }
       }
     } catch (error) {
       console.error('生成短链失败:', error)
@@ -199,7 +276,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
     }
   }
 
-  const copyToClipboard = async (text: string, id: number) => {
+  const copyToClipboard = async (text: string, id: string) => {
     try {
       await navigator.clipboard.writeText(text)
       setCopySuccess(id.toString())
@@ -209,7 +286,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
     }
   }
 
-  const deleteLink = async (id: number) => {
+  const deleteLink = async (id: string) => {
     const confirmed = await confirmDialog.confirm({
       type: 'danger',
       title: '确认删除',
@@ -242,8 +319,9 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
     }
   }
 
-  const showPassword = (id: number) => {
+  const showPassword = (id: string) => {
     setCurrentLinkId(id)
+    setLoadingPasswordId(id)
     setAdminError('')
     setShowAdminModal(true)
   }
@@ -295,6 +373,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
       setAdminError('网络错误，请重试')
     } finally {
       setLoadingPassword(false)
+      setLoadingPasswordId(null)
     }
   }
 
@@ -302,11 +381,119 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
     setShowAdminModal(false)
     setAdminError('')
     setCurrentLinkId(null)
+    setLoadingPasswordId(null)
   }
 
   const closePasswordModal = () => {
     setShowPasswordModal(false)
     setCurrentPassword('')
+  }
+
+  // 切换编辑展开状态
+  const toggleEditExpand = (link: ShortLink) => {
+    if (expandedEditId === link.id) {
+      setExpandedEditId(null)
+    } else {
+      setExpandedEditId(link.id)
+    }
+  }
+
+  // 处理编辑保存
+  const handleEditSave = async (linkId: string, updateData: any) => {
+    try {
+      const response = await fetch(`/api/links/${linkId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData)
+      })
+
+      if (response.ok) {
+        const updatedLink = await response.json()
+        setLinks(links.map(link => 
+          link.id === updatedLink.id ? updatedLink : link
+        ))
+        setExpandedEditId(null)
+        notificationDialog.notify({
+          type: 'success',
+          message: '短链更新成功'
+        })
+      } else {
+        const error = await response.json()
+        notificationDialog.notify({
+          type: 'error',
+          message: error.error || '更新失败'
+        })
+      }
+    } catch (error) {
+      console.error('更新短链失败:', error)
+      notificationDialog.notify({
+        type: 'error',
+        message: '网络错误，请重试'
+      })
+    }
+  }
+
+  // 筛选和排序逻辑
+  const filteredAndSortedLinks = useMemo(() => {
+    let filtered = links
+
+    // 搜索筛选
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(link => 
+        link.shortUrl.toLowerCase().includes(query) ||
+        link.originalUrl.toLowerCase().includes(query) ||
+        (link.title && link.title.toLowerCase().includes(query)) ||
+        link.path.toLowerCase().includes(query)
+      )
+    }
+
+    // 类型筛选
+    if (filterType !== 'all') {
+      filtered = filtered.filter(link => {
+        switch (filterType) {
+          case 'password':
+            return link.hasPassword
+          case 'confirm':
+            return link.requireConfirm && !link.hasPassword
+          case 'auto':
+            return !link.hasPassword && !link.requireConfirm && link.enableIntermediate
+          case 'direct':
+            return !link.hasPassword && !link.requireConfirm && !link.enableIntermediate
+          default:
+            return true
+        }
+      })
+    }
+
+    // 排序
+    const sorted = [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case 'newest':
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        case 'oldest':
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        case 'views':
+          return b.views - a.views
+        case 'title':
+          const aTitle = (a.title || a.originalUrl).toLowerCase()
+          const bTitle = (b.title || b.originalUrl).toLowerCase()
+          return aTitle.localeCompare(bTitle)
+        default:
+          return 0
+      }
+    })
+
+    return sorted
+  }, [links, searchQuery, filterType, sortBy])
+
+  // 清空搜索
+  const clearSearch = () => {
+    setSearchQuery('')
+    setFilterType('all')
+    setSortBy('newest')
   }
 
   return (
@@ -323,17 +510,27 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
       {/* 输入区域 */}
       <div className={`cute-card p-2 md:p-3 mb-8 shadow-xl shadow-blue-100/50 relative z-10 ${isClient ? 'animate__animated animate__fadeInUp' : ''}`}>
         <div className="flex flex-col md:flex-row gap-2">
-          <div className="cute-input-wrapper flex-1 bg-slate-50 rounded-xl px-4 py-3 flex items-center gap-3">
+          <div className={`cute-input-wrapper flex-1 bg-slate-50 rounded-xl px-4 py-3 flex items-center gap-3 ${
+            formErrors.url ? 'border-2 border-red-300' : ''
+          }`}>
             <Link2 className="text-slate-400" />
             <input 
               type="text" 
               placeholder={t('inputPlaceholder')}
               className="flex-1 bg-transparent border-none outline-none text-lg text-slate-800 placeholder-slate-400"
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              onChange={(e) => {
+                setUrl(e.target.value)
+                if (formErrors.url) {
+                  setFormErrors(prev => ({ ...prev, url: '' }))
+                }
+              }}
               onKeyDown={(e) => e.key === 'Enter' && generateLink()}
             />
           </div>
+          {formErrors.url && (
+            <p className="text-xs text-red-500 mt-1 ml-2">{formErrors.url}</p>
+          )}
           <button 
             onClick={generateLink}
             disabled={isGenerating || !url}
@@ -364,40 +561,89 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
           <div className={`grid gap-4 overflow-hidden transition-all duration-300 ease-out ${
             showAdvanced ? 'grid-rows-[1fr] opacity-100 pt-4 pb-2 border-t border-slate-100 mt-2' : 'grid-rows-[0fr] opacity-0 h-0'
           }`}>
-            <div className="min-h-0 grid md:grid-cols-2 gap-4">
+            <div className="min-h-0 space-y-4">
               
-              {/* 自定义地址 */}
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1 ml-1">{t('customAddress')}</label>
-                <div className="cute-input-wrapper bg-white rounded-lg px-3 py-2 flex items-center gap-2 text-sm">
-                  <span className="text-slate-400">{process.env.NEXT_PUBLIC_BASE_URL?.replace(/^https?:\/\//, '') || 'localhost:3000'}/</span>
-                  <input 
-                    type="text" 
-                    placeholder={t('customAddressPlaceholder')}
-                    className="w-full outline-none text-slate-700"
-                    value={customPath}
-                    onChange={(e) => setCustomPath(e.target.value)}
-                  />
+              {/* 第一行：自定义地址和访问密码 */}
+              <div className="grid md:grid-cols-2 gap-4">
+                {/* 自定义地址 */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1 ml-1">{t('customAddress')}</label>
+                  <div className={`cute-input-wrapper bg-white rounded-lg px-3 py-2 flex items-center gap-2 text-sm ${
+                    formErrors.customPath ? 'border border-red-300' : ''
+                  }`}>
+                    <span className="text-slate-400">{process.env.NEXT_PUBLIC_BASE_URL?.replace(/^https?:\/\//, '') || 'localhost:3000'}/</span>
+                    <input 
+                      type="text" 
+                      placeholder={t('customAddressPlaceholder')}
+                      className="w-full outline-none text-slate-700"
+                      value={customPath}
+                      onChange={(e) => {
+                        setCustomPath(e.target.value)
+                        if (formErrors.customPath) {
+                          setFormErrors(prev => ({ ...prev, customPath: '' }))
+                        }
+                      }}
+                    />
+                  </div>
+                  {formErrors.customPath && (
+                    <p className="text-xs text-red-500 mt-1">{formErrors.customPath}</p>
+                  )}
+                </div>
+
+                {/* 访问密码 */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1 ml-1">{t('password')}</label>
+                  <div className={`cute-input-wrapper bg-white rounded-lg px-3 py-2 flex items-center gap-2 text-sm ${
+                    formErrors.password ? 'border border-red-300' : ''
+                  }`}>
+                    <Lock size={14} className="text-slate-400" />
+                    <input 
+                      type="text" 
+                      placeholder={t('passwordPlaceholder')}
+                      className="w-full outline-none text-slate-700"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value)
+                        if (formErrors.password) {
+                          setFormErrors(prev => ({ ...prev, password: '' }))
+                        }
+                      }}
+                    />
+                  </div>
+                  {formErrors.password && (
+                    <p className="text-xs text-red-500 mt-1">{formErrors.password}</p>
+                  )}
                 </div>
               </div>
 
-              {/* 访问密码 */}
+              {/* 第二行：过期时间 */}
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1 ml-1">{t('password')}</label>
-                <div className="cute-input-wrapper bg-white rounded-lg px-3 py-2 flex items-center gap-2 text-sm">
-                  <Lock size={14} className="text-slate-400" />
+                <label className="block text-xs font-medium text-slate-500 mb-1 ml-1">过期时间</label>
+                <div className={`cute-input-wrapper bg-white rounded-lg px-3 py-2 flex items-center gap-2 text-sm ${
+                  formErrors.expiresAt ? 'border border-red-300' : ''
+                }`}>
+                  <Calendar size={14} className="text-slate-400" />
                   <input 
-                    type="text" 
-                    placeholder={t('passwordPlaceholder')}
+                    type="datetime-local" 
+                    placeholder="设置过期时间"
                     className="w-full outline-none text-slate-700"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    value={expiresAt}
+                    onChange={(e) => {
+                      setExpiresAt(e.target.value)
+                      if (formErrors.expiresAt) {
+                        setFormErrors(prev => ({ ...prev, expiresAt: '' }))
+                      }
+                    }}
                   />
                 </div>
+                {formErrors.expiresAt && (
+                  <p className="text-xs text-red-500 mt-1">{formErrors.expiresAt}</p>
+                )}
+                <p className="text-xs text-slate-500 mt-1">留空表示永不过期</p>
               </div>
 
-              {/* 开关选项 */}
-              <div className="md:col-span-2 flex flex-col gap-3 mt-2">
+              {/* 第三行：开关选项 */}
+              <div className="flex flex-col gap-3">
                 
                 {/* 开启过渡页 */}
                 <label className={`flex items-center justify-between p-3 rounded-lg border transition-colors group ${
@@ -464,87 +710,320 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
         </div>
       </div>
 
+      {/* 搜索和筛选区域 */}
+      {links.length > 0 && (
+        <div className={`cute-card p-4 mb-6 ${isClient ? 'animate__animated animate__fadeInUp' : ''}`}>
+          {/* 搜索框 */}
+          <div className="flex flex-col md:flex-row gap-3 mb-4">
+            <div className="cute-input-wrapper flex-1 bg-slate-50 rounded-lg px-4 py-3 flex items-center gap-3">
+              <Search className="text-slate-400" size={18} />
+              <input 
+                type="text" 
+                placeholder="搜索短链、原链接或标题..."
+                className="flex-1 bg-transparent border-none outline-none text-slate-700 placeholder-slate-400"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery('')}
+                  className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+            
+            {/* 筛选按钮 */}
+            <button 
+              onClick={() => setShowFilters(!showFilters)}
+              className={`px-4 py-3 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                showFilters || filterType !== 'all' || sortBy !== 'newest'
+                  ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              <Filter size={18} />
+              筛选
+              {(filterType !== 'all' || sortBy !== 'newest') && (
+                <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+              )}
+            </button>
+          </div>
+
+          {/* 筛选选项面板 */}
+          <div className={`grid gap-4 overflow-hidden transition-all duration-300 ease-out ${
+            showFilters ? 'grid-rows-[1fr] opacity-100 pt-4 border-t border-slate-100' : 'grid-rows-[0fr] opacity-0 h-0'
+          }`}>
+            <div className="min-h-0 grid md:grid-cols-2 gap-4">
+              
+              {/* 类型筛选 */}
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-2">链接类型</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button 
+                    onClick={() => setFilterType('all')}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      filterType === 'all' 
+                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    全部
+                  </button>
+                  <button 
+                    onClick={() => setFilterType('password')}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
+                      filterType === 'password' 
+                        ? 'bg-orange-100 text-orange-700 border border-orange-200' 
+                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Lock size={14} />
+                    密码
+                  </button>
+                  <button 
+                    onClick={() => setFilterType('confirm')}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
+                      filterType === 'confirm' 
+                        ? 'bg-green-100 text-green-700 border border-green-200' 
+                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Shield size={14} />
+                    确认
+                  </button>
+                  <button 
+                    onClick={() => setFilterType('auto')}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
+                      filterType === 'auto' 
+                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Zap size={14} />
+                    自动跳转
+                  </button>
+                  <button 
+                    onClick={() => setFilterType('direct')}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
+                      filterType === 'direct' 
+                        ? 'bg-purple-100 text-purple-700 border border-purple-200' 
+                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <ExternalLink size={14} />
+                    直接跳转
+                  </button>
+                </div>
+              </div>
+
+              {/* 排序选项 */}
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-2">排序方式</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button 
+                    onClick={() => setSortBy('newest')}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
+                      sortBy === 'newest' 
+                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Calendar size={14} />
+                    最新
+                  </button>
+                  <button 
+                    onClick={() => setSortBy('oldest')}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
+                      sortBy === 'oldest' 
+                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Calendar size={14} />
+                    最早
+                  </button>
+                  <button 
+                    onClick={() => setSortBy('views')}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
+                      sortBy === 'views' 
+                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Eye size={14} />
+                    访问量
+                  </button>
+                  <button 
+                    onClick={() => setSortBy('title')}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
+                      sortBy === 'title' 
+                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <SortAsc size={14} />
+                    标题
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 清空筛选 */}
+            {(searchQuery || filterType !== 'all' || sortBy !== 'newest') && (
+              <div className="flex justify-end pt-2 border-t border-slate-100">
+                <button 
+                  onClick={clearSearch}
+                  className="px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  清空筛选
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* 搜索结果统计 */}
+          {(searchQuery || filterType !== 'all') && (
+            <div className="mt-3 pt-3 border-t border-slate-100 text-sm text-slate-500">
+              找到 {filteredAndSortedLinks.length} 个结果
+              {searchQuery && ` (搜索: "${searchQuery}")`}
+              {filterType !== 'all' && ` (类型: ${
+                filterType === 'password' ? '密码保护' :
+                filterType === 'confirm' ? '二次确认' :
+                filterType === 'auto' ? '自动跳转' :
+                filterType === 'direct' ? '直接跳转' : ''
+              })`}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 短链列表 */}
       <div className="space-y-4">
-        {links.map((link, idx) => (
+        {filteredAndSortedLinks.map((link, idx) => (
           <div 
             key={link.id} 
-            className={`cute-card p-4 flex flex-col md:flex-row items-center gap-4 ${isClient ? 'animate__animated animate__fadeInUp' : ''}`}
+            className={`cute-card ${isClient ? 'animate__animated animate__fadeInUp' : ''}`}
             style={isClient ? { animationDelay: `${idx * 0.1}s` } : {}}
           >
-            {/* 图标 */}
-            <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center flex-shrink-0 text-slate-400">
-              {link.hasPassword ? <Lock size={20} className="text-[var(--color-warning)]" /> : 
-               link.requireConfirm ? <Shield size={20} className="text-[var(--color-success)]" /> :
-               <Zap size={20} className="text-[var(--color-primary)]" />}
-            </div>
-
-            {/* 信息 */}
-            <div className="flex-1 min-w-0 text-center md:text-left w-full">
-              <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
-                <h3 
-                  className="font-bold text-lg text-[var(--color-primary)] cursor-pointer hover:underline truncate"
-                  onClick={() => onSimulateVisit(link)}
-                >
-                  {link.shortUrl}
-                </h3>
-                <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md border border-slate-200 hidden md:inline-block">
-                  {formatTimeAgo(new Date(link.createdAt))}
-                </span>
-              </div>
-              <p className="text-sm text-slate-500 truncate max-w-md mx-auto md:mx-0">
-                {link.title || link.originalUrl}
-              </p>
-            </div>
-
-            {/* 统计和操作 */}
-            <div className="flex items-center gap-6 text-slate-500 text-sm">
-              <div className="flex items-center gap-1" title={t('views')}>
-                <Eye size={16} />
-                <span>{link.views}</span>
-              </div>
-              
-              {/* 操作按钮 */}
-              <div className="flex items-center gap-2 pl-4 border-l border-slate-100">
-                {/* 密码查看按钮 - 仅在有密码时显示 */}
-                {link.hasPassword && (
-                  <button 
-                    className="p-2 hover:bg-orange-50 rounded-lg text-slate-500 hover:text-orange-600 transition-colors active:scale-95"
-                    title="查看密码"
-                    onClick={() => showPassword(link.id)}
-                    disabled={loadingPassword}
-                  >
-                    {loadingPassword ? (
-                      <div className="w-4 h-4 border-2 border-orange-300 border-t-orange-600 rounded-full animate-spin" />
-                    ) : (
-                      <Eye size={18} />
-                    )}
-                  </button>
+            {/* 短链信息行 */}
+            <div className="p-4 flex flex-col md:flex-row items-center gap-4">
+              {/* 图标 */}
+              <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center flex-shrink-0 text-slate-400">
+                {link.hasPassword ? (
+                  <Lock size={20} className="text-orange-600" />
+                ) : link.requireConfirm ? (
+                  <Shield size={20} className="text-green-600" />
+                ) : link.enableIntermediate ? (
+                  <Zap size={20} className="text-blue-600" />
+                ) : (
+                  <ExternalLink size={20} className="text-purple-600" />
                 )}
-                <button 
-                  className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-[var(--color-primary)] transition-colors active:scale-95"
-                  title={copySuccess === link.id.toString() ? t('copied') : t('copy')}
-                  onClick={() => copyToClipboard(link.shortUrl, link.id)}
-                >
-                  <Copy size={18} />
-                </button>
-                <button 
-                  className="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-[var(--color-error)] transition-colors active:scale-95"
-                  title={t('delete')}
-                  onClick={() => deleteLink(link.id)}
-                >
-                  <Trash2 size={18} />
-                </button>
+              </div>
+
+              {/* 信息 */}
+              <div className="flex-1 min-w-0 text-center md:text-left w-full">
+                <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
+                  <h3 
+                    className="font-bold text-lg text-[var(--color-primary)] cursor-pointer hover:underline truncate"
+                    onClick={() => onSimulateVisit(link)}
+                  >
+                    {link.shortUrl}
+                  </h3>
+                  <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md border border-slate-200 hidden md:inline-block">
+                    {formatTimeAgo(new Date(link.createdAt))}
+                  </span>
+                </div>
+                <p className="text-sm text-slate-500 truncate max-w-md mx-auto md:mx-0">
+                  {link.title || link.originalUrl}
+                </p>
+              </div>
+
+              {/* 统计和操作 */}
+              <div className="flex items-center gap-6 text-slate-500 text-sm">
+                <div className="flex items-center gap-1" title={t('views')}>
+                  <Eye size={16} />
+                  <span>{link.views}</span>
+                </div>
+                
+                {/* 操作按钮 */}
+                <div className="flex items-center gap-2 pl-4 border-l border-slate-100">
+                  {/* 密码查看按钮 - 仅在有密码时显示 */}
+                  {link.hasPassword && (
+                    <button 
+                      className="p-2 hover:bg-orange-50 rounded-lg text-slate-500 hover:text-orange-600 transition-colors active:scale-95"
+                      title="查看密码"
+                      onClick={() => showPassword(link.id)}
+                      disabled={loadingPasswordId === link.id}
+                    >
+                      {loadingPasswordId === link.id ? (
+                        <div className="w-4 h-4 border-2 border-orange-300 border-t-orange-600 rounded-full animate-spin" />
+                      ) : (
+                        <Eye size={18} />
+                      )}
+                    </button>
+                  )}
+                  <button 
+                    className={`p-2 rounded-lg transition-colors active:scale-95 ${
+                      expandedEditId === link.id 
+                        ? 'bg-blue-100 text-blue-600' 
+                        : 'hover:bg-blue-50 text-slate-500 hover:text-blue-600'
+                    }`}
+                    title="编辑"
+                    onClick={() => toggleEditExpand(link)}
+                  >
+                    <Edit size={18} />
+                  </button>
+                  <button 
+                    className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-[var(--color-primary)] transition-colors active:scale-95"
+                    title={copySuccess === link.id.toString() ? t('copied') : t('copy')}
+                    onClick={() => copyToClipboard(link.shortUrl, link.id)}
+                  >
+                    <Copy size={18} />
+                  </button>
+                  <button 
+                    className="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-[var(--color-error)] transition-colors active:scale-95"
+                    title={t('delete')}
+                    onClick={() => deleteLink(link.id)}
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
               </div>
             </div>
+
+            {/* 编辑面板 */}
+            <EditPanel 
+              link={link}
+              isExpanded={expandedEditId === link.id}
+              onSave={handleEditSave}
+              onCancel={() => setExpandedEditId(null)}
+            />
           </div>
         ))}
         
+        {/* 空状态显示 */}
         {links.length === 0 && (
           <div className="text-center py-12 text-slate-400">
             <Link2 size={48} className="mx-auto mb-4 opacity-50" />
             <p>{t('noLinks')}</p>
             <p className="text-sm">{t('noLinksDesc')}</p>
+          </div>
+        )}
+        
+        {/* 搜索无结果 */}
+        {links.length > 0 && filteredAndSortedLinks.length === 0 && (
+          <div className="text-center py-12 text-slate-400">
+            <Search size={48} className="mx-auto mb-4 opacity-50" />
+            <p>没有找到匹配的短链</p>
+            <p className="text-sm">尝试调整搜索条件或筛选选项</p>
+            <button 
+              onClick={clearSearch}
+              className="mt-4 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium"
+            >
+              清空筛选
+            </button>
           </div>
         )}
       </div>
@@ -670,7 +1149,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                 />
                 {currentPassword && (
                   <button 
-                    onClick={() => copyToClipboard(currentPassword, -1)}
+                    onClick={() => copyToClipboard(currentPassword, 'password')}
                     className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-[var(--color-primary)] transition-colors"
                     title="复制密码"
                   >
@@ -719,6 +1198,8 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
         type={notificationDialog.options.type}
         confirmText={notificationDialog.options.confirmText}
       />
+
+
     </div>
   )
 }

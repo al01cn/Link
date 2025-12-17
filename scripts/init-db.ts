@@ -9,7 +9,7 @@ config({ path: path.resolve(process.cwd(), '.env.local') })
 const prisma = new PrismaClient()
 
 async function main() {
-  console.log('🚀 开始初始化数据库...')
+  console.log('[启动] 开始初始化数据库...')
 
   // 创建默认系统设置
   await prisma.setting.upsert({
@@ -30,17 +30,27 @@ async function main() {
     }
   })
 
+  // 创建人机验证设置
+  await prisma.setting.upsert({
+    where: { key: 'captcha_enabled' },
+    update: {},
+    create: {
+      key: 'captcha_enabled',
+      value: 'false'  // 默认关闭人机验证
+    }
+  })
+
   // 清理现有的域名规则（如果有的话）
   await prisma.domainRule.deleteMany({})
   
-  console.log('📋 域名规则已清空，请在设置页面添加白名单域名')
+  console.log('[信息] 域名规则已清空，请在设置页面添加白名单域名')
 
-  console.log('✅ 数据库初始化完成！')
+  console.log('[完成] 数据库初始化完成！')
 }
 
 main()
   .catch((e) => {
-    console.error('❌ 数据库初始化失败:', e)
+    console.error('[错误] 数据库初始化失败:', e)
     process.exit(1)
   })
   .finally(async () => {
