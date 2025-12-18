@@ -1,0 +1,27 @@
+[build]
+command = "npx prisma generate && next build"
+publish = ".next"
+
+[template.environment]
+DATABASE_PROVIDER = "数据库类型：postgresql 或 mysql"
+DATABASE_URL = "PostgreSQL / MySQL 连接字符串"
+NEXT_PUBLIC_BASE_URL = "应用访问地址，例如：https://xxx.netlify.app"
+ENCRYPTION_KEY = "密码加密密钥，请使用强随机字符串"
+NEXT_PUBLIC_TURNSTILE_SITE_KEY = "Cloudflare Turnstile 站点密钥（可选）"
+TURNSTILE_SECRET_KEY = "Cloudflare Turnstile 私钥（可选）"
+
+# 函数配置
+[functions]
+directory = ".netlify/functions"
+
+# 重定向规则
+[[redirects]]
+from = "/api/*"
+to = "/.netlify/functions/:splat"
+status = 200
+
+# Next.js 路由支持
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200

@@ -69,15 +69,90 @@ bun run build && bun run start
 
 > ⚠️ 首次登录后系统会强制要求修改默认密码
 
-## 🚀 部署指南
+## 🚀 一键部署
 
 ### Vercel 部署
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fal01cn%2FLink)
+点击下面按钮即可一键部署到 Vercel：
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/al01cn/Link&env=DATABASE_PROVIDER,DATABASE_URL,NEXT_PUBLIC_BASE_URL,ENCRYPTION_KEY&envDescription=数据库配置和应用密钥&envLink=https://github.com/al01cn/Link/blob/main/.env.example)
 
 ### Netlify 部署
 
+点击下面按钮即可一键部署到 Netlify：
+
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/al01cn/Link)
+
+**部署时需要配置的环境变量：**
+- `DATABASE_PROVIDER` - 数据库类型（postgresql 或 mysql）
+- `DATABASE_URL` - 数据库连接字符串
+- `NEXT_PUBLIC_BASE_URL` - 应用访问地址
+- `ENCRYPTION_KEY` - 密码加密密钥
+
+> 💡 **提示**：推荐使用 [Supabase](https://supabase.com) 或 [Neon](https://neon.tech) 的免费 PostgreSQL 数据库。
+
+## 🚀 部署指南
+
+### Serverless 平台部署
+
+> ⚠️ **重要提醒**：在无状态 Serverless 托管平台（如 Vercel、Netlify、Railway 等）部署时，**必须将 SQLite 数据库更换为其他数据库**，因为 Serverless 环境不支持持久化文件存储。
+
+#### 推荐的数据库选择
+
+**1. PostgreSQL（推荐）**
+```bash
+# 环境变量配置
+DATABASE_PROVIDER="postgresql"
+DATABASE_URL="postgresql://username:password@host:5432/database"
+```
+
+**2. MySQL**
+```bash
+# 环境变量配置
+DATABASE_PROVIDER="mysql"
+DATABASE_URL="mysql://username:password@host:3306/database"
+```
+
+**3. 云数据库服务推荐**
+- **Supabase** - 免费的 PostgreSQL 托管服务
+- **PlanetScale** - 无服务器 MySQL 平台
+- **Neon** - 现代化的 PostgreSQL 平台
+- **Railway** - 支持多种数据库的云平台
+
+#### 数据库迁移步骤
+
+1. **更新环境变量**
+   ```bash
+   # 设置数据库提供商和连接字符串
+   DATABASE_PROVIDER="postgresql"  # 或 "mysql"
+   DATABASE_URL="postgresql://username:password@host:5432/database"
+   ```
+
+2. **重新生成 Prisma 客户端**
+   ```bash
+   bun run prisma generate
+   ```
+
+3. **执行数据库迁移**
+   ```bash
+   bun run prisma db push
+   ```
+
+> 📖 **详细迁移指南**：查看 [DATABASE_MIGRATION.md](./DATABASE_MIGRATION.md) 获取完整的数据库迁移步骤和常见问题解决方案。
+
+## 🚀 一键部署到 Netlify
+
+点击下面按钮即可一键部署，系统会自动提示配置必需的环境变量：
+
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/al01cn/Link)
+
+**部署时需要配置的环境变量：**
+- `DATABASE_PROVIDER` - 数据库类型（postgresql 或 mysql）
+- `DATABASE_URL` - 数据库连接字符串
+- `NEXT_PUBLIC_BASE_URL` - 应用访问地址
+- `ENCRYPTION_KEY` - 密码加密密钥
+
+> 💡 **提示**：Netlify 会根据 `netlify.toml` 配置自动提示需要配置的环境变量。
 
 ### Docker 部署
 
@@ -89,13 +164,33 @@ docker-compose up -d
 docker-compose exec app bun run setup
 ```
 
+> 📝 **Docker 部署说明**：Docker 部署支持 SQLite，因为容器提供了持久化存储。
+
 ### 环境变量配置
 
 ```bash
 # 必需配置
-DATABASE_URL="file:./dev.db"                    # 数据库连接
+DATABASE_PROVIDER="sqlite"                      # 数据库提供商：sqlite | postgresql | mysql
+DATABASE_URL="file:./dev.db"                    # SQLite数据库连接（本地开发）
 NEXT_PUBLIC_BASE_URL="http://localhost:3000"    # 应用URL
 ENCRYPTION_KEY="your-secret-key"                # 加密密钥
+
+# Serverless 部署数据库配置示例
+# PostgreSQL
+# DATABASE_PROVIDER="postgresql"
+# DATABASE_URL="postgresql://username:password@host:5432/database"
+
+# MySQL
+# DATABASE_PROVIDER="mysql"
+# DATABASE_URL="mysql://username:password@host:3306/database"
+
+# Supabase (PostgreSQL)
+# DATABASE_PROVIDER="postgresql"
+# DATABASE_URL="postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres"
+
+# PlanetScale (MySQL)
+# DATABASE_PROVIDER="mysql"
+# DATABASE_URL="mysql://[username]:[password]@[host]/[database]?sslaccept=strict"
 
 # 可选配置
 NEXT_PUBLIC_TURNSTILE_SITE_KEY="your-site-key"  # Cloudflare验证

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npx prisma generate && next build",
     "build:prod": "tsx scripts/build-production.ts",
     "package:prod": "tsx scripts/create-deployment-package.ts",
     "start": "npx prisma generate && npx prisma db push && next start",
