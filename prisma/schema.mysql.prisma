@@ -1,0 +1,79 @@
+// MySQL 数据库配置
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// 短链模型
+model ShortLink {
+  id           String   @id @default(uuid()) @db.VarChar(36) // 使用UUID作为主键
+  path         String   @unique @db.VarChar(255) // 短链路径，如 "abc123"
+  originalUrl  String   @db.Text // 原始长链接
+  title        String?  @db.VarChar(500) // 页面标题（自动抓取）
+  
+  // 安全选项
+  password     String?  @db.VarChar(255) // 访问密码
+  expiresAt    DateTime? // 过期时间
+  requireConfirm Boolean @default(false) // 是否需要二次确认
+  enableIntermediate Boolean @default(true) // 是否启用过渡页
+  
+  // 统计信息
+  views        Int      @default(0) // 访问次数
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  // 访问日志
+  visitLogs    VisitLog[]
+}
+
+// 访问日志模型
+model VisitLog {
+  id        String   @id @default(uuid()) @db.VarChar(36) // 使用UUID作为主键
+  shortId   String   @db.VarChar(36) // 关联短链的UUID
+  ip        String?  @db.VarChar(45)
+  userAgent String?  @db.Text
+  referer   String?  @db.Text
+  createdAt DateTime @default(now())
+  
+  shortLink ShortLink @relation(fields: [shortId], references: [id], onDelete: Cascade)
+}
+
+// 系统设置模型
+model Setting {
+  key   String @id @db.VarChar(255)
+  value String @db.Text
+}
+
+// 域名白名单/黑名单
+model DomainRule {
+  id     String @id @default(uuid()) @db.VarChar(36)
+  domain String @unique @db.VarChar(255)
+  type   String @db.VarChar(50) // "whitelist" | "blacklist"
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+}
+
+// 管理员账户模型
+model Admin {
+  id        String   @id @default(uuid()) @db.VarChar(36) // 使用UUID作为主键
+  username  String   @unique @db.VarChar(255)
+  password  String   @db.VarChar(255) // 加密后的密码
+  isDefault Boolean  @default(false) // 是否为默认账户
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 系统日志模型
+model Log {
+  id        String   @id @default(uuid()) @db.VarChar(36) // 使用UUID作为主键
+  type      String   @db.VarChar(50) // 日志类型: "visit" | "create" | "error"
+  message   String   @db.Text // 日志消息
+  details   String?  @db.Text // 详细信息（JSON字符串）
+  ip        String?  @db.VarChar(45) // 客户端IP
+  userAgent String?  @db.Text // 用户代理
+  createdAt DateTime @default(now())
+}

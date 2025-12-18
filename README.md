@@ -89,7 +89,7 @@ bun run build && bun run start
 - `NEXT_PUBLIC_BASE_URL` - 应用访问地址
 - `ENCRYPTION_KEY` - 密码加密密钥
 
-> 💡 **提示**：推荐使用 [Supabase](https://supabase.com) 或 [Neon](https://neon.tech) 的免费 PostgreSQL 数据库。
+> 💡 **提示**：推荐使用 [Supabase](https://supabase.com) 或 [Neon](https://neon.tech) 的免费 PostgreSQL 数据库。系统会根据 `DATABASE_PROVIDER` 自动选择正确的数据库 schema。
 
 ## 🚀 部署指南
 
@@ -137,6 +137,8 @@ DATABASE_URL="mysql://username:password@host:3306/database"
    ```bash
    bun run prisma db push
    ```
+
+> 🎯 **自动化优势**：系统会根据 `DATABASE_PROVIDER` 环境变量自动选择正确的 Prisma schema 文件，无需手动修改配置。
 
 > 📖 **详细迁移指南**：查看 [DATABASE_MIGRATION.md](./DATABASE_MIGRATION.md) 获取完整的数据库迁移步骤和常见问题解决方案。
 
