@@ -40,6 +40,7 @@ function ToPageContent() {
   const [captchaError, setCaptchaError] = useState('')
   const [captchaVerified, setCaptchaVerified] = useState(false)
   const [preloadEnabled, setPreloadEnabled] = useState(true)
+  const [hasJumped, setHasJumped] = useState(false) // 防止重复跳转
 
 
   // 客户端水合完成后启用动画
@@ -71,13 +72,18 @@ function ToPageContent() {
     
     if (canStartCountdown) {
       const timer = setInterval(() => {
-        setCountdown(prev => prev - 1)
+        setCountdown(prev => {
+          if (prev <= 1) {
+            // 倒计时结束，触发跳转
+            setTimeout(() => handleProceed(), 0) // 使用 setTimeout 确保状态更新完成
+            return 0
+          }
+          return prev - 1
+        })
       }, 1000)
       return () => clearInterval(timer)
-    } else if (countdown === 0 && targetUrl && redirectType === 'auto' && (!captchaEnabled || captchaVerified)) {
-      handleProceed()
     }
-  }, [countdown, targetUrl, error, isLoading, redirectType, captchaEnabled, captchaVerified])
+  }, [targetUrl, error, isLoading, redirectType, captchaEnabled, captchaVerified]) // 移除 countdown 依赖，避免循环
 
   // 自动跳转模式的预加载逻辑
   useEffect(() => {
@@ -149,7 +155,9 @@ function ToPageContent() {
 
   const handleProceed = async () => {
     // 防止重复处理
-    if (isLoading) return
+    if (isLoading || hasJumped) return
+    
+    setHasJumped(true) // 标记已经开始跳转
     
     // 如果启用了人机验证但未验证，阻止跳转
     if (captchaEnabled && !captchaVerified) {
@@ -220,14 +228,11 @@ function ToPageContent() {
     setCaptchaToken(token)
     setCaptchaError('')
     setCaptchaVerified(true)
-    // 如果是自动跳转模式，验证通过后重置倒计时
-    if (redirectType === 'auto') {
-      setCountdown(5)
-    }
     // 人机验证通过后，如果启用预加载且是确认模式，则开始预加载
     if (preloadEnabled && targetUrl && redirectType === 'confirm') {
       preloadTargetUrl(targetUrl)
     }
+    // 注意：不再重置倒计时，让现有的倒计时逻辑自然处理
   }
 
   // 处理人机验证失败

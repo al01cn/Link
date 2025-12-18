@@ -48,6 +48,7 @@ export default function SafeRedirectClient({
   const [autoFillPasswordEnabled, setAutoFillPasswordEnabled] = useState(true)
   const [autoFillAttempted, setAutoFillAttempted] = useState(false)
   const [isExpired, setIsExpired] = useState(false)
+  const [hasJumped, setHasJumped] = useState(false) // 防止重复跳转
   
   // 检查链接是否过期
   const checkIfExpired = () => {
@@ -156,7 +157,9 @@ export default function SafeRedirectClient({
 
   // 处理跳转逻辑
   const handleProceed = useCallback(async (inputPassword?: string) => {
-    if (isProcessing) return
+    if (isProcessing || hasJumped) return
+    
+    setHasJumped(true) // 标记已经开始跳转
     
     // 检查是否过期
     if (checkIfExpired()) {
@@ -340,13 +343,18 @@ export default function SafeRedirectClient({
 
     if (countdown > 0) {
       const timer = setInterval(() => {
-        setCountdown(prev => prev - 1)
+        setCountdown(prev => {
+          if (prev <= 1) {
+            // 倒计时结束，触发跳转
+            setTimeout(() => handleProceed(), 0) // 使用 setTimeout 确保状态更新完成
+            return 0
+          }
+          return prev - 1
+        })
       }, 1000)
       return () => clearInterval(timer)
-    } else {
-      handleProceed() // 自动跳转
     }
-  }, [countdown, enableCountdown, handleProceed, domainBlocked])
+  }, [enableCountdown, domainBlocked]) // 移除 countdown 和 handleProceed 依赖，避免循环
 
   // 预加载逻辑
   useEffect(() => {
@@ -394,12 +402,7 @@ export default function SafeRedirectClient({
     setCaptchaToken(token)
     setCaptchaError('')
     setCaptchaVerified(true)
-    // 如果只需要人机验证（不需要密码和手动确认），验证通过后开始倒计时
-    if (captchaEnabled && !hasPassword && !requireConfirm && enableIntermediate) {
-      // 重置倒计时，开始自动跳转
-      setCountdown(5) // 使用默认倒计时时间
-    }
-    // 注意：预加载逻辑已移至 useEffect 中处理，这里不再重复预加载
+    // 注意：不再重置倒计时，让现有的倒计时逻辑自然处理
     // 人机验证通过后，如果有自动填充的密码，自动提交
     if (autoFillPasswordEnabled && autoFillPassword && hasPassword && password === autoFillPassword) {
       setTimeout(() => {

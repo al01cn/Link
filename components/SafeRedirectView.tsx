@@ -59,6 +59,7 @@ export default function SafeRedirectView({
   const [captchaVerified, setCaptchaVerified] = useState(false)
   const [autoFillAttempted, setAutoFillAttempted] = useState(false)
   const [isExpired, setIsExpired] = useState(false)
+  const [hasJumped, setHasJumped] = useState(false) // 防止重复跳转
   
   // 检查链接是否过期
   const checkIfExpired = () => {
@@ -265,14 +266,18 @@ export default function SafeRedirectView({
 
     if (countdown > 0) {
       const timer = setInterval(() => {
-        setCountdown(prev => prev - 1)
+        setCountdown(prev => {
+          if (prev <= 1) {
+            // 倒计时结束，触发跳转
+            setTimeout(() => handleAutoRedirect(), 0) // 使用 setTimeout 确保状态更新完成
+            return 0
+          }
+          return prev - 1
+        })
       }, 1000)
       return () => clearInterval(timer)
-    } else {
-      // 自动跳转前记录统计
-      handleAutoRedirect()
     }
-  }, [countdown, enableCountdown, onProceed, domainBlocked])
+  }, [enableCountdown, domainBlocked]) // 移除 countdown 和 onProceed 依赖，避免循环
 
   // 预加载逻辑
   useEffect(() => {
@@ -298,6 +303,9 @@ export default function SafeRedirectView({
 
   // 处理自动跳转
   const handleAutoRedirect = async () => {
+    if (hasJumped) return // 防止重复跳转
+    setHasJumped(true) // 标记已经开始跳转
+    
     if (isToMode) {
       // TO模式：记录TO访问统计
       try {
@@ -391,12 +399,7 @@ export default function SafeRedirectView({
     setCaptchaToken(token)
     setCaptchaError('')
     setCaptchaVerified(true)
-    // 如果只需要人机验证（不需要密码和手动确认），验证通过后开始倒计时
-    if (captchaEnabled && !hasPassword && !requireConfirm) {
-      // 重置倒计时，开始自动跳转
-      setCountdown(waitTime)
-    }
-    // 注意：预加载逻辑已移至 useEffect 中处理，这里不再重复预加载
+    // 注意：不再重置倒计时，让现有的倒计时逻辑自然处理
     // 人机验证通过后，如果有自动填充的密码，自动提交
     if (autoFillPasswordEnabled && autoFillPassword && hasPassword && password === autoFillPassword) {
       setTimeout(() => {
