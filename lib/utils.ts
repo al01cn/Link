@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid'
 
 // 获取动态的基础URL
-export function getBaseUrl(): string {
+export function getBaseUrl(request?: Request): string {
   // 优先使用环境变量
   if (process.env.NEXT_PUBLIC_BASE_URL) {
     return process.env.NEXT_PUBLIC_BASE_URL
@@ -12,12 +12,29 @@ export function getBaseUrl(): string {
     return `${window.location.protocol}//${window.location.host}`
   }
   
-  // 服务端fallback（这种情况下应该设置环境变量）
-  return 'http://localhost:3000'
+  // 服务端：尝试从请求头获取
+  if (request) {
+    const host = request.headers.get('host')
+    const protocol = request.headers.get('x-forwarded-proto') || 
+                    (request.headers.get('x-forwarded-ssl') === 'on' ? 'https' : 'http')
+    
+    if (host) {
+      return `${protocol}://${host}`
+    }
+  }
+  
+  // 服务端fallback：从其他环境变量尝试获取
+  const vercelUrl = process.env.VERCEL_URL
+  if (vercelUrl) {
+    return `https://${vercelUrl}`
+  }
+  
+  const port = process.env.PORT || '3000'
+  return `http://localhost:${port}`
 }
 
 // 获取动态的主机名（不包含协议）
-export function getHostname(): string {
+export function getHostname(request?: Request): string {
   // 优先使用环境变量
   if (process.env.NEXT_PUBLIC_BASE_URL) {
     return process.env.NEXT_PUBLIC_BASE_URL.replace(/^https?:\/\//, '')
@@ -28,8 +45,22 @@ export function getHostname(): string {
     return window.location.host
   }
   
-  // 服务端fallback
-  return 'localhost:3000'
+  // 服务端：尝试从请求头获取
+  if (request) {
+    const host = request.headers.get('host')
+    if (host) {
+      return host
+    }
+  }
+  
+  // 服务端fallback：从其他环境变量尝试获取
+  const vercelUrl = process.env.VERCEL_URL
+  if (vercelUrl) {
+    return vercelUrl
+  }
+  
+  const port = process.env.PORT || '3000'
+  return `localhost:${port}`
 }
 
 // 生成短链路径

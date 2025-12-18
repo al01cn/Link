@@ -66,11 +66,13 @@ class DatabasePool {
     if (this.isConnected) return
 
     try {
+      console.log('🔌 正在建立数据库连接...')
       await this.prisma.$connect()
       this.isConnected = true
-      console.log('数据库连接池已建立')
+      console.log('✅ 数据库连接池已建立')
+      console.log(`📊 连接配置: 最大连接数=${this.config.maxConnections}, 超时=${this.config.connectionTimeout}ms`)
     } catch (error) {
-      console.error('数据库连接失败:', error)
+      console.error('❌ 数据库连接失败:', error)
       throw error
     }
   }

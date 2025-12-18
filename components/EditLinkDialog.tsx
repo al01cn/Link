@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link2, Lock, Shield, Zap, X, ExternalLink, Calendar, Save, AlertCircle } from 'lucide-react'
 import { useConfirmDialog } from '@/lib/useDialog'
 import { useLanguage } from '@/lib/LanguageContext'
-import { getHostname } from '@/lib/utils'
+import { useHostname } from '@/lib/useHostname'
 import ConfirmDialog from './ConfirmDialog'
 
 interface ShortLink {
@@ -39,6 +39,9 @@ export default function EditLinkDialog({
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [isLoading, setIsLoading] = useState(false)
   const confirmDialog = useConfirmDialog()
+  
+  // 获取当前主机名（客户端专用）
+  const hostname = useHostname()
   
   // 表单状态
   const [originalUrl, setOriginalUrl] = useState('')
@@ -290,7 +293,7 @@ export default function EditLinkDialog({
                 errors.customPath ? 'border-red-300 ring-1 ring-red-300' : ''
               }`}>
                 <span className="text-slate-400 text-sm">
-                  {getHostname()}/
+                  {hostname}/
                 </span>
                 <input 
                   type="text" 

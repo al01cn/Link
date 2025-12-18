@@ -162,7 +162,7 @@ export async function PUT(
       }
     })
 
-    const baseUrl = getBaseUrl()
+    const baseUrl = getBaseUrl(request)
 
     return NextResponse.json({
       id: updatedLink.id,

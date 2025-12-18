@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link2, ArrowRight, Settings, ChevronDown, Lock, Shield, Zap, Eye, Copy, Trash2, X, Search, Filter, Calendar, SortAsc, SortDesc, MousePointer, ExternalLink, Edit, Check } from 'lucide-react'
-import { formatTimeAgo, formatTimeRemaining, getHostname } from '@/lib/utils'
+import { formatTimeAgo, formatTimeRemaining } from '@/lib/utils'
+import { useHostname } from '@/lib/useHostname'
 import { TranslationKey } from '@/lib/translations'
 import { useConfirmDialog, useNotificationDialog } from '@/lib/useDialog'
 import { requestCache } from '@/lib/requestCache'
@@ -37,6 +38,9 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [copySuccess, setCopySuccess] = useState<string | null>(null)
   const [isClient, setIsClient] = useState(false)
+  
+  // 获取当前主机名（客户端专用）
+  const hostname = useHostname()
   
   // 搜索和筛选状态
   const [searchQuery, setSearchQuery] = useState('')
@@ -736,7 +740,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                   <div className={`cute-input-wrapper bg-white dark:bg-slate-800 rounded-lg px-3 py-2 flex items-center gap-2 text-sm ${
                     formErrors.customPath ? 'border border-red-300 dark:border-red-400' : ''
                   }`}>
-                    <span className="text-slate-400 dark:text-slate-500">{getHostname()}/</span>
+                    <span className="text-slate-400 dark:text-slate-500">{hostname}/</span>
                     <input 
                       type="text" 
                       placeholder={t('customAddressPlaceholder')}

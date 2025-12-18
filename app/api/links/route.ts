@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
         existingLink: {
           id: existingUrl.id,
           path: existingUrl.path,
-          shortUrl: `${getBaseUrl()}/${existingUrl.path}`
+          shortUrl: `${getBaseUrl(request)}/${existingUrl.path}`
         }
       }, { status: 409 })
     }
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       id: shortLink.id,
       path: shortLink.path,
-      shortUrl: `${getBaseUrl()}/${shortLink.path}`,
+      shortUrl: `${getBaseUrl(request)}/${shortLink.path}`,
       originalUrl: shortLink.originalUrl,
       title: shortLink.title,
       views: shortLink.views,
@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
       take: 50
     })
 
-    const baseUrl = getBaseUrl()
+    const baseUrl = getBaseUrl(request)
     
     const formattedLinks = links.map(link => ({
       id: link.id,

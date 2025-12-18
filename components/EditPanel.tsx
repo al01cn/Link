@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Lock, Shield, Zap, ExternalLink, Calendar, Save, AlertCircle } from 'lucide-react'
 import { useLanguage } from '@/lib/LanguageContext'
-import { getHostname } from '@/lib/utils'
+import { useHostname } from '@/lib/useHostname'
 
 interface ShortLink {
   id: string
@@ -28,6 +28,10 @@ interface EditPanelProps {
 
 export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPanelProps) {
   const { t } = useLanguage()
+  
+  // 获取当前主机名（客户端专用）
+  const hostname = useHostname()
+  
   // 表单状态
   const [originalUrl, setOriginalUrl] = useState('')
   const [customPath, setCustomPath] = useState('')
@@ -209,7 +213,7 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
                   errors.customPath ? 'border-red-300 dark:border-red-400' : ''
                 }`}>
                   <span className="text-slate-400 dark:text-slate-500 text-sm">
-                    {getHostname()}/
+                    {hostname}/
                   </span>
                   <input 
                     type="text" 
