@@ -48,23 +48,59 @@ export function decryptPassword(encryptedPassword: string): string {
 }
 
 /**
- * 验证密码是否正确
+ * 检测字符串是否为加密格式
+ * @param str 待检测的字符串
+ * @returns 是否为加密格式
+ */
+export function isEncryptedFormat(str: string): boolean {
+  if (!str) return false
+  
+  try {
+    // AES 加密后的字符串通常包含特定的字符和长度特征
+    // 这里使用简单的启发式检测
+    return str.length > 20 && /^[A-Za-z0-9+/=]+$/.test(str)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 验证密码是否正确（支持不同验证模式）
  * @param inputPassword 用户输入的密码
  * @param storedPassword 存储的加密密码
+ * @param isAutoFill 是否为自动填充（pwd参数），默认false表示手动输入
  * @returns 是否匹配
  */
-export function verifyPassword(inputPassword: string, storedPassword: string): boolean {
+export function verifyPassword(inputPassword: string, storedPassword: string, isAutoFill: boolean = false): boolean {
   if (!inputPassword || !storedPassword) return false
   
   try {
-    // 首先尝试直接比较（处理明文密码的情况）
-    if (inputPassword === storedPassword) {
-      return true
+    if (isAutoFill) {
+      // pwd 参数模式：支持明文密码和加密字符串两种格式
+      
+      // 方式1：直接比较加密字符串（用于传递加密密码的情况）
+      if (inputPassword === storedPassword) {
+        return true
+      }
+      
+      // 方式2：解密存储密码后与输入密码比较（用于传递明文密码的情况）
+      const decryptedStored = decryptPassword(storedPassword)
+      if (inputPassword === decryptedStored) {
+        return true
+      }
+      
+      return false
+    } else {
+      // 手动输入模式：只支持明文密码验证
+      
+      // 解密存储密码后与输入的明文密码比较
+      const decryptedStored = decryptPassword(storedPassword)
+      if (inputPassword === decryptedStored) {
+        return true
+      }
+      
+      return false
     }
-    
-    // 然后尝试解密后比较
-    const decrypted = decryptPassword(storedPassword)
-    return inputPassword === decrypted
   } catch (error) {
     console.error('密码验证失败:', error)
     return false

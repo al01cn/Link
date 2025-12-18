@@ -2,10 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { translateForRequest } from '@/lib/translations'
 import { validateDomainRule } from '@/lib/utils'
+import { verifyAdminToken } from '@/lib/adminAuth'
 
 // 获取域名规则列表
 export async function GET(request: NextRequest) {
   try {
+    // 验证管理员权限
+    const adminPayload = verifyAdminToken(request)
+    if (!adminPayload) {
+      return NextResponse.json({ error: translateForRequest(request, 'apiAdminRequired') }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type') // 'whitelist' | 'blacklist'
     
@@ -26,6 +33,12 @@ export async function GET(request: NextRequest) {
 // 添加域名规则
 export async function POST(request: NextRequest) {
   try {
+    // 验证管理员权限
+    const adminPayload = verifyAdminToken(request)
+    if (!adminPayload) {
+      return NextResponse.json({ error: translateForRequest(request, 'apiAdminRequired') }, { status: 401 })
+    }
+
     const body = await request.json()
     const { domain, type } = body
     

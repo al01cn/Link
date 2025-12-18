@@ -3,7 +3,7 @@
  * @description 该组件包含三个主要部分：API端点列表、TO跳转规则说明和OpenAPI规范文档。支持端点详情展开/折叠、代码复制、OpenAPI规范下载等功能。
  * (This component contains three main parts: API endpoint list, TO redirect rules documentation, and OpenAPI specification. Supports endpoint details expand/collapse, code copying, OpenAPI spec download and other features.)
  * 
- * @author ShortLink Team
+ * @author AL01 Link Team
  * @version 1.0.0
  * @since 2024-12-17
  * 
@@ -13,7 +13,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Book, ChevronDown, ChevronRight, Copy, Check, X, Download, ExternalLink } from 'lucide-react'
 import { useLanguage } from '@/lib/LanguageContext'
 
@@ -414,7 +414,8 @@ const getApiEndpoints = (t: (key: any, params?: Record<string, string | number>)
     requestBody: {
       type: 'object',
       properties: {
-        password: { type: 'string', required: false, description: t('accessPasswordIfNeededDesc'), example: 'secret123' }
+        password: { type: 'string', required: false, description: t('accessPasswordIfNeededDesc'), example: 'secret123' },
+        isAutoFill: { type: 'boolean', required: false, description: t('isAutoFillDesc'), example: false }
       }
     },
     responses: {
@@ -490,7 +491,8 @@ const getToRedirectRules = (t: (key: any, params?: Record<string, string | numbe
       required: true,
       description: t('tokenConfigDesc2'),
       example: 'eyJ1cmwiOiJodHRwczovL2V4YW1wbGUuY29tIiwidHlwZSI6ImF1dG8ifQ=='
-    }
+    },
+
   ],
   /** Token配置模式定义（Token configuration schema definition） */
   tokenSchema: {
@@ -568,18 +570,62 @@ interface ApiDocumentationProps {
  * ```
  */
 export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
   const { t, language } = useLanguage()
   /** 展开的端点集合（Set of expanded endpoints） */
   const [expandedEndpoints, setExpandedEndpoints] = useState<Set<string>>(new Set())
   /** 当前复制的文本标识（Current copied text identifier） */
   const [copiedText, setCopiedText] = useState<string | null>(null)
   /** 当前激活的标签页（Currently active tab） */
-  const [activeTab, setActiveTab] = useState<'endpoints' | 'to-rules' | 'openapi'>('endpoints')
+  const [activeTab, setActiveTab] = useState<'endpoints' | 'to-rules' | 'password-autofill' | 'openapi'>('endpoints')
+  /** 当前主题状态 */
+  const [isDarkMode, setIsDarkMode] = useState(false)
 
   // 获取本地化的 API 端点数据
   const apiEndpoints = getApiEndpoints(t)
   // 获取本地化的 TO 跳转规则数据
   const toRedirectRules = getToRedirectRules(t)
+
+  // 初始化主题状态
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      setIsDarkMode(document.documentElement.classList.contains('dark'))
+    }
+  }, [])
+
+  // 控制dialog的打开和关闭
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+
+    if (isOpen) {
+      dialog.showModal()
+      // 更新主题状态
+      setIsDarkMode(document.documentElement.classList.contains('dark'))
+    } else {
+      dialog.close()
+    }
+  }, [isOpen])
+
+  // 监听主题变化
+  useEffect(() => {
+    if (!isOpen) return
+
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+          setIsDarkMode(document.documentElement.classList.contains('dark'))
+        }
+      })
+    })
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    })
+
+    return () => observer.disconnect()
+  }, [isOpen])
 
   /**
    * 切换端点展开状态（Toggle endpoint expansion state）
@@ -637,70 +683,78 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
     }
   }
 
-  if (!isOpen) return null
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col">
+    <dialog
+      ref={dialogRef}
+      className="backdrop:bg-black/50 backdrop:backdrop-blur-sm bg-transparent rounded-lg w-full max-w-6xl h-[90vh] p-0"
+      onClose={onClose}
+    >
+      <div className={`rounded-lg shadow-xl w-full h-full flex flex-col border ${isDarkMode ? 'bg-slate-800 text-slate-200 border-slate-600' : 'bg-white text-gray-900 border-gray-200'}`}>
         {/* 头部 */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className={`flex items-center justify-between p-6 border-b ${isDarkMode ? 'border-slate-600' : 'border-gray-200'}`}>
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white">
               <Book size={18} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">{t('apiDocumentation')}</h2>
-              <p className="text-sm text-gray-600">ShortLink API {t('apiDocumentation')}</p>
+              <h2 className={`text-xl font-bold ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('apiDocumentation')}</h2>
+              <p className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>{t('appTitle')} {t('apiDocumentation')}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className={`p-2 rounded-lg transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-gray-100 text-gray-600'}`}
           >
             <X size={20} />
           </button>
         </div>
 
         {/* 标签页和操作按钮 */}
-        <div className="flex items-center justify-between border-b border-gray-200">
-          <div className="flex">
+        <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between border-b ${isDarkMode ? 'border-slate-600' : 'border-gray-200'}`}>
+          <div className="flex overflow-x-auto scrollbar-hide">
             <button
               onClick={() => setActiveTab('endpoints')}
-              className={`px-6 py-3 font-medium text-sm border-b-2 transition-colors ${
-                activeTab === 'endpoints'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
+              className={`px-3 sm:px-6 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${activeTab === 'endpoints'
+                  ? `border-blue-500 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`
+                  : `border-transparent ${isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-gray-600 hover:text-gray-900'}`
+                }`}
             >
               {t('apiEndpoints')}
             </button>
             <button
               onClick={() => setActiveTab('to-rules')}
-              className={`px-6 py-3 font-medium text-sm border-b-2 transition-colors ${
-                activeTab === 'to-rules'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
+              className={`px-3 sm:px-6 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${activeTab === 'to-rules'
+                  ? `border-blue-500 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`
+                  : `border-transparent ${isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-gray-600 hover:text-gray-900'}`
+                }`}
             >
               {t('toRedirectRules')}
             </button>
             <button
+              onClick={() => setActiveTab('password-autofill')}
+              className={`px-3 sm:px-6 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${activeTab === 'password-autofill'
+                  ? `border-blue-500 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`
+                  : `border-transparent ${isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-gray-600 hover:text-gray-900'}`
+                }`}
+            >
+              {t('passwordAutoFill')}
+            </button>
+            <button
               onClick={() => setActiveTab('openapi')}
-              className={`px-6 py-3 font-medium text-sm border-b-2 transition-colors ${
-                activeTab === 'openapi'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
+              className={`px-3 sm:px-6 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${activeTab === 'openapi'
+                  ? `border-blue-500 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`
+                  : `border-transparent ${isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-gray-600 hover:text-gray-900'}`
+                }`}
             >
               {t('openApiSpec')}
             </button>
           </div>
-          
+
           {/* OpenAPI 操作按钮 */}
-          <div className="flex items-center gap-2 px-6">
+          <div className="flex items-center gap-2 px-3 sm:px-6 py-2 sm:py-0">
             <button
-              onClick={() => window.open('/api/openapi', '_blank')}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+              onClick={() => window.open(`/api/openapi?lang=${language}`, '_blank')}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-md transition-colors"
               title={t('viewOpenApiSpec')}
             >
               <ExternalLink size={16} />
@@ -716,13 +770,13 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
                */
               onClick={async () => {
                 try {
-                  const response = await fetch('/api/openapi')
+                  const response = await fetch(`/api/openapi?lang=${language}`)
                   const spec = await response.json()
                   const blob = new Blob([JSON.stringify(spec, null, 2)], { type: 'application/json' })
                   const url = URL.createObjectURL(blob)
                   const link = document.createElement('a')
                   link.href = url
-                  link.download = 'shortlink-openapi.json'
+                  link.download = `al01link-openapi-${language}.json`
                   document.body.appendChild(link)
                   link.click()
                   document.body.removeChild(link)
@@ -731,7 +785,7 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
                   console.error(t('downloadOpenApiSpecFailed') + ':', error)
                 }
               }}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-md transition-colors"
               title={t('downloadOpenApiSpecFile')}
             >
               <Download size={16} />
@@ -747,12 +801,12 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
               {apiEndpoints.map((endpoint, index) => {
                 const key = `${endpoint.method}-${endpoint.path}`
                 const isExpanded = expandedEndpoints.has(key)
-                
+
                 return (
-                  <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div key={index} className={`border rounded-lg overflow-hidden ${isDarkMode ? 'border-slate-600' : 'border-gray-200'}`}>
                     {/* 接口头部 */}
                     <div
-                      className="p-4 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
+                      className={`p-4 cursor-pointer transition-colors ${isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-50 hover:bg-gray-100'}`}
                       onClick={() => toggleEndpoint(key)}
                     >
                       <div className="flex items-center justify-between">
@@ -760,31 +814,36 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
                           <span className={`px-3 py-1 rounded-md text-xs font-bold border ${getMethodColor(endpoint.method)}`}>
                             {endpoint.method}
                           </span>
-                          <code className="text-sm font-mono text-gray-800">{endpoint.path}</code>
-                          <span className="text-sm text-gray-600">{endpoint.summary}</span>
+                          <code className={`text-sm font-mono ${isDarkMode ? 'text-slate-200' : 'text-gray-800'}`}>{endpoint.path}</code>
+                          <span className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>{endpoint.summary}</span>
                         </div>
-                        {isExpanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                        <div className={isDarkMode ? 'text-slate-400' : 'text-gray-600'}>
+                          {isExpanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                        </div>
                       </div>
                     </div>
 
                     {/* 接口详情 */}
                     {isExpanded && (
-                      <div className="p-4 space-y-4">
-                        <p className="text-gray-700">{endpoint.description}</p>
+                      <div className={`p-4 space-y-4 ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}>
+                        <p className={`${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>{endpoint.description}</p>
 
                         {/* 请求参数 */}
                         {endpoint.parameters && (
                           <div>
-                            <h4 className="font-semibold text-gray-900 mb-2">{t('requestParameters')}</h4>
-                            <div className="bg-gray-50 rounded-lg p-3">
+                            <h4 className={`font-semibold mb-2 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('requestParameters')}</h4>
+                            <div className={`rounded-lg p-3 ${isDarkMode ? 'bg-slate-700' : 'bg-gray-50'}`}>
                               {endpoint.parameters.map((param, i) => (
                                 <div key={i} className="flex items-start gap-3 py-2">
-                                  <code className="text-sm font-mono text-blue-600">{param.name}</code>
-                                  <span className={`px-2 py-1 rounded text-xs ${param.required ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'}`}>
+                                  <code className={`text-sm font-mono ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>{param.name}</code>
+                                  <span className={`px-2 py-1 rounded text-xs ${param.required 
+                                    ? `${isDarkMode ? 'bg-red-900/50 text-red-300' : 'bg-red-100 text-red-800'}` 
+                                    : `${isDarkMode ? 'bg-slate-600 text-slate-300' : 'bg-gray-100 text-gray-600'}`
+                                  }`}>
                                     {param.required ? t('required') : t('optional')}
                                   </span>
-                                  <span className="text-sm text-gray-600">{param.type}</span>
-                                  <span className="text-sm text-gray-700 flex-1">{param.description}</span>
+                                  <span className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>{param.type}</span>
+                                  <span className={`text-sm flex-1 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>{param.description}</span>
                                 </div>
                               ))}
                             </div>
@@ -794,16 +853,19 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
                         {/* 请求体 */}
                         {endpoint.requestBody && (
                           <div>
-                            <h4 className="font-semibold text-gray-900 mb-2">{t('requestBody')}</h4>
-                            <div className="bg-gray-50 rounded-lg p-3">
+                            <h4 className={`font-semibold mb-2 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('requestBody')}</h4>
+                            <div className={`rounded-lg p-3 ${isDarkMode ? 'bg-slate-700' : 'bg-gray-50'}`}>
                               {Object.entries(endpoint.requestBody.properties).map(([key, prop]) => (
                                 <div key={key} className="flex items-start gap-3 py-2">
-                                  <code className="text-sm font-mono text-blue-600">{key}</code>
-                                  <span className={`px-2 py-1 rounded text-xs ${prop.required ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'}`}>
+                                  <code className={`text-sm font-mono ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>{key}</code>
+                                  <span className={`px-2 py-1 rounded text-xs ${prop.required 
+                                    ? `${isDarkMode ? 'bg-red-900/50 text-red-300' : 'bg-red-100 text-red-800'}` 
+                                    : `${isDarkMode ? 'bg-slate-600 text-slate-300' : 'bg-gray-100 text-gray-600'}`
+                                  }`}>
                                     {prop.required ? t('required') : t('optional')}
                                   </span>
-                                  <span className="text-sm text-gray-600">{prop.type}</span>
-                                  <span className="text-sm text-gray-700 flex-1">{prop.description}</span>
+                                  <span className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>{prop.type}</span>
+                                  <span className={`text-sm flex-1 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>{prop.description}</span>
                                 </div>
                               ))}
                             </div>
@@ -812,31 +874,32 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
 
                         {/* 响应示例 */}
                         <div>
-                          <h4 className="font-semibold text-gray-900 mb-2">{t('responseExample')}</h4>
+                          <h4 className={`font-semibold mb-2 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('responseExample')}</h4>
                           {Object.entries(endpoint.responses).map(([status, response]) => (
                             <div key={status} className="mb-3">
                               <div className="flex items-center gap-2 mb-2">
-                                <span className={`px-2 py-1 rounded text-xs font-bold ${
-                                  status.startsWith('2') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                <span className={`px-2 py-1 rounded text-xs font-bold ${status.startsWith('2') 
+                                  ? `${isDarkMode ? 'bg-green-900/50 text-green-300' : 'bg-green-100 text-green-800'}` 
+                                  : `${isDarkMode ? 'bg-red-900/50 text-red-300' : 'bg-red-100 text-red-800'}`
                                 }`}>
                                   {status}
                                 </span>
-                                <span className="text-sm text-gray-600">{response.description}</span>
+                                <span className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>{response.description}</span>
                               </div>
                               {response.example && (
                                 <div className="relative">
-                                  <p className="text-sm text-gray-600 mb-2">{t('example')}:</p>
-                                  <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg text-sm overflow-x-auto">
+                                  <p className={`text-sm mb-2 ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>{t('example')}:</p>
+                                  <pre className={`p-3 rounded-lg text-sm overflow-x-auto ${isDarkMode ? 'bg-slate-900 text-slate-200' : 'bg-gray-900 text-gray-100'}`}>
                                     <code>{JSON.stringify(response.example, null, 2)}</code>
                                   </pre>
                                   <button
                                     onClick={() => copyToClipboard(JSON.stringify(response.example, null, 2), `${key}-${status}`)}
-                                    className="absolute top-2 right-2 p-1 hover:bg-gray-700 rounded transition-colors"
+                                    className={`absolute top-2 right-2 p-1 rounded transition-colors ${isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-gray-700'}`}
                                   >
                                     {copiedText === `${key}-${status}` ? (
                                       <Check size={16} className="text-green-400" />
                                     ) : (
-                                      <Copy size={16} className="text-gray-400" />
+                                      <Copy size={16} className={isDarkMode ? 'text-slate-500' : 'text-gray-400'} />
                                     )}
                                   </button>
                                 </div>
@@ -854,23 +917,23 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
             <div className="space-y-6">
               {/* TO 跳转规则 */}
               <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">{toRedirectRules.title}</h3>
-                <p className="text-gray-700 mb-4">{toRedirectRules.description}</p>
-                
+                <h3 className={`text-lg font-bold mb-2 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{toRedirectRules.title}</h3>
+                <p className={`mb-4 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>{toRedirectRules.description}</p>
+
                 <div className="space-y-4">
                   {toRedirectRules.rules.map((rule, index) => (
-                    <div key={index} className="border border-gray-200 rounded-lg p-4">
+                    <div key={index} className={`border rounded-lg p-4 ${isDarkMode ? 'border-slate-600 bg-slate-800' : 'border-gray-200 bg-white'}`}>
                       <div className="flex items-start gap-3 mb-2">
-                        <code className="bg-blue-100 text-blue-800 px-3 py-1 rounded-md text-sm font-mono">
+                        <code className={`px-3 py-1 rounded-md text-sm font-mono ${isDarkMode ? 'bg-blue-900/50 text-blue-300' : 'bg-blue-100 text-blue-800'}`}>
                           {rule.pattern}
                         </code>
                       </div>
-                      <p className="text-gray-700 mb-2">{rule.description}</p>
-                      <div className="bg-gray-50 rounded-lg p-3">
-                        <p className="text-sm text-gray-600 mb-1">{t('example')}:</p>
-                        <code className="text-sm font-mono text-green-600">{rule.example}</code>
+                      <p className={`mb-2 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>{rule.description}</p>
+                      <div className={`rounded-lg p-3 ${isDarkMode ? 'bg-slate-700' : 'bg-gray-50'}`}>
+                        <p className={`text-sm mb-1 ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>{t('example')}:</p>
+                        <code className={`text-sm font-mono ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>{rule.example}</code>
                       </div>
-                      <p className="text-sm text-gray-600 mt-2 italic">{rule.note}</p>
+                      <p className={`text-sm mt-2 italic ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>{rule.note}</p>
                     </div>
                   ))}
                 </div>
@@ -878,16 +941,19 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
 
               {/* 参数说明 */}
               <div>
-                <h4 className="font-semibold text-gray-900 mb-3">{t('parameterDescription')}</h4>
-                <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className={`font-semibold mb-3 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('parameterDescription')}</h4>
+                <div className={`rounded-lg p-4 ${isDarkMode ? 'bg-slate-700' : 'bg-gray-50'}`}>
                   {toRedirectRules.parameters.map((param, index) => (
                     <div key={index} className="flex items-start gap-3 py-2">
-                      <code className="text-sm font-mono text-blue-600">{param.name}</code>
-                      <span className={`px-2 py-1 rounded text-xs ${param.required ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'}`}>
+                      <code className={`text-sm font-mono ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>{param.name}</code>
+                      <span className={`px-2 py-1 rounded text-xs ${param.required 
+                        ? `${isDarkMode ? 'bg-red-900/50 text-red-300' : 'bg-red-100 text-red-800'}` 
+                        : `${isDarkMode ? 'bg-slate-600 text-slate-300' : 'bg-gray-100 text-gray-600'}`
+                      }`}>
                         {param.required ? t('required') : t('optional')}
                       </span>
-                      <span className="text-sm text-gray-600">{param.type}</span>
-                      <span className="text-sm text-gray-700 flex-1">{param.description}</span>
+                      <span className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>{param.type}</span>
+                      <span className={`text-sm flex-1 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>{param.description}</span>
                     </div>
                   ))}
                 </div>
@@ -964,7 +1030,7 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
                   <div className="bg-gray-900 text-gray-100 p-4 rounded-lg">
                     <p className="text-sm text-gray-400 mb-2"># {t('tokenDecodeExample')}</p>
                     <pre className="text-green-400 text-xs overflow-x-auto">
-{`{
+                      {`{
   "url": "https://github.com",
   "type": "confirm",
   "title": "${t('jumpToGitHub')}",
@@ -983,7 +1049,7 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
                   <div className="bg-gray-900 text-gray-100 p-4 rounded-lg">
                     <p className="text-sm text-gray-400 mb-2"># {t('captchaTokenDecodeExample')}</p>
                     <pre className="text-green-400 text-xs overflow-x-auto">
-{`{
+                      {`{
   "url": "https://example.com",
   "type": "auto",
   "title": "${t('secureRedirect')}",
@@ -996,87 +1062,220 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
                 </div>
               </div>
             </div>
+          ) : activeTab === 'password-autofill' ? (
+            <div className="space-y-6">
+              {/* 密码自动填充功能 */}
+              <div>
+                <h3 className={`text-lg font-bold mb-2 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('passwordAutoFill')}</h3>
+                <p className={`mb-4 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>{t('passwordAutoFillDesc')}</p>
+                
+                {/* 功能概述 */}
+                <div className={`border rounded-lg p-4 mb-6 ${isDarkMode ? 'bg-blue-900/20 border-blue-700' : 'bg-blue-50 border-blue-200'}`}>
+                  <h4 className={`font-semibold mb-2 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('featureOverview')}</h4>
+                  <p className={`text-sm mb-3 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>{t('passwordAutoFillOverview')}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div className="flex items-start gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                      <div>
+                        <span className={`font-medium ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('manualInputMode')}</span>
+                        <p className={isDarkMode ? 'text-slate-400' : 'text-gray-600'}>{t('manualInputModeDesc')}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                      <div>
+                        <span className={`font-medium ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('autoFillMode')}</span>
+                        <p className={isDarkMode ? 'text-slate-400' : 'text-gray-600'}>{t('autoFillModeDesc')}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 使用方式 */}
+                <div>
+                  <h4 className={`font-semibold mb-3 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('usageMethod')}</h4>
+                  <div className="space-y-4">
+                    <div className={`border rounded-lg p-4 ${isDarkMode ? 'border-slate-600 bg-slate-800' : 'border-gray-200 bg-white'}`}>
+                      <h5 className={`font-medium mb-2 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('plainTextPassword')}</h5>
+                      <p className={`text-sm mb-3 ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>{t('plainTextPasswordDesc')}</p>
+                      <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-slate-900 text-slate-200' : 'bg-gray-900 text-gray-100'}`}>
+                        <code className="text-green-400 text-sm">https://yourdomain.com/abc123?pwd=mypassword</code>
+                      </div>
+                    </div>
+                    
+                    <div className={`border rounded-lg p-4 ${isDarkMode ? 'border-slate-600 bg-slate-800' : 'border-gray-200 bg-white'}`}>
+                      <h5 className={`font-medium mb-2 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('encryptedPassword')}</h5>
+                      <p className={`text-sm mb-3 ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>{t('encryptedPasswordDesc')}</p>
+                      <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-slate-900 text-slate-200' : 'bg-gray-900 text-gray-100'}`}>
+                        <code className="text-green-400 text-sm break-all">https://yourdomain.com/abc123?pwd=U2FsdGVkX1+encrypted_password_string</code>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* API 参数说明 */}
+                <div>
+                  <h4 className={`font-semibold mb-3 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('apiParameters')}</h4>
+                  <div className={`rounded-lg p-4 ${isDarkMode ? 'bg-slate-700' : 'bg-gray-50'}`}>
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3 py-2">
+                        <code className={`text-sm font-mono ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>pwd</code>
+                        <span className={`px-2 py-1 rounded text-xs ${isDarkMode ? 'bg-slate-600 text-slate-300' : 'bg-gray-100 text-gray-600'}`}>{t('optional')}</span>
+                        <span className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>string</span>
+                        <span className={`text-sm flex-1 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>{t('pwdParamDesc')}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 验证流程 */}
+                <div>
+                  <h4 className={`font-semibold mb-3 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('verificationProcess')}</h4>
+                  <div className={`border rounded-lg p-4 ${isDarkMode ? 'bg-yellow-900/20 border-yellow-700' : 'bg-yellow-50 border-yellow-200'}`}>
+                    <ol className={`text-sm space-y-2 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+                      <li className="flex items-start gap-2">
+                        <span className="bg-yellow-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">1</span>
+                        <span>{t('step1GetPwdParam')}</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="bg-yellow-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">2</span>
+                        <span>{t('step2AutoFillPassword')}</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="bg-yellow-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">3</span>
+                        <span>{t('step3SmartVerification')}</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="bg-yellow-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">4</span>
+                        <span>{t('step4AutoSubmit')}</span>
+                      </li>
+                    </ol>
+                  </div>
+                </div>
+
+                {/* 安全特性 */}
+                <div>
+                  <h4 className={`font-semibold mb-3 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('securityFeatures')}</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className={`border rounded-lg p-4 ${isDarkMode ? 'border-green-700 bg-green-900/20' : 'border-green-200 bg-green-50'}`}>
+                      <h5 className={`font-medium mb-2 ${isDarkMode ? 'text-green-300' : 'text-green-900'}`}>{t('manualInputProtection')}</h5>
+                      <p className={`text-sm ${isDarkMode ? 'text-green-400' : 'text-green-700'}`}>{t('manualInputProtectionDesc')}</p>
+                    </div>
+                    <div className={`border rounded-lg p-4 ${isDarkMode ? 'border-blue-700 bg-blue-900/20' : 'border-blue-200 bg-blue-50'}`}>
+                      <h5 className={`font-medium mb-2 ${isDarkMode ? 'text-blue-300' : 'text-blue-900'}`}>{t('smartRecognition')}</h5>
+                      <p className={`text-sm ${isDarkMode ? 'text-blue-400' : 'text-blue-700'}`}>{t('smartRecognitionDesc')}</p>
+                    </div>
+                    <div className={`border rounded-lg p-4 ${isDarkMode ? 'border-purple-700 bg-purple-900/20' : 'border-purple-200 bg-purple-50'}`}>
+                      <h5 className={`font-medium mb-2 ${isDarkMode ? 'text-purple-300' : 'text-purple-900'}`}>{t('encryptedTransmission')}</h5>
+                      <p className={`text-sm ${isDarkMode ? 'text-purple-400' : 'text-purple-700'}`}>{t('encryptedTransmissionDesc')}</p>
+                    </div>
+                    <div className={`border rounded-lg p-4 ${isDarkMode ? 'border-orange-700 bg-orange-900/20' : 'border-orange-200 bg-orange-50'}`}>
+                      <h5 className={`font-medium mb-2 ${isDarkMode ? 'text-orange-300' : 'text-orange-900'}`}>{t('backwardCompatibility')}</h5>
+                      <p className={`text-sm ${isDarkMode ? 'text-orange-400' : 'text-orange-700'}`}>{t('backwardCompatibilityDesc')}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 配置选项 */}
+                <div>
+                  <h4 className={`font-semibold mb-3 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('configurationOptions')}</h4>
+                  <div className={`border rounded-lg p-4 ${isDarkMode ? 'border-slate-600 bg-slate-800' : 'border-gray-200 bg-white'}`}>
+                    <p className={`text-sm mb-3 ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>{t('configurationOptionsDesc')}</p>
+                    <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-slate-900 text-slate-200' : 'bg-gray-900 text-gray-100'}`}>
+                      <pre className="text-green-400 text-sm">
+{`PUT /api/settings
+Content-Type: application/json
+
+{
+  "autoFillPasswordEnabled": true  // ${t('enableDisableAutoFill')}
+}`}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="space-y-6">
               {/* OpenAPI 规范 */}
               <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-4">{t('openApiVersion')}</h3>
-                <p className="text-gray-700 mb-4">
+                <h3 className={`text-lg font-bold mb-4 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('openApiVersion')}</h3>
+                <p className={`mb-4 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>
                   {t('openApiDesc')}
                 </p>
-                
-                <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                  <h4 className="font-semibold text-gray-900 mb-2">{t('specInfo')}</h4>
+
+                <div className={`rounded-lg p-4 mb-4 ${isDarkMode ? 'bg-slate-700' : 'bg-gray-50'}`}>
+                  <h4 className={`font-semibold mb-2 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('specInfo')}</h4>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="text-gray-600">{t('version')}:</span>
-                      <span className="ml-2 font-mono">3.0.3</span>
+                      <span className={isDarkMode ? 'text-slate-400' : 'text-gray-600'}>{t('version')}:</span>
+                      <span className={`ml-2 font-mono ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>3.0.3</span>
                     </div>
                     <div>
-                      <span className="text-gray-600">{t('apiVersion')}:</span>
-                      <span className="ml-2 font-mono">1.0.0</span>
+                      <span className={isDarkMode ? 'text-slate-400' : 'text-gray-600'}>{t('apiVersion')}:</span>
+                      <span className={`ml-2 font-mono ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>1.0.0</span>
                     </div>
                     <div>
-                      <span className="text-gray-600">{t('format')}:</span>
-                      <span className="ml-2 font-mono">JSON</span>
+                      <span className={isDarkMode ? 'text-slate-400' : 'text-gray-600'}>{t('format')}:</span>
+                      <span className={`ml-2 font-mono ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>JSON</span>
                     </div>
                     <div>
-                      <span className="text-gray-600">{t('encoding')}:</span>
-                      <span className="ml-2 font-mono">UTF-8</span>
+                      <span className={isDarkMode ? 'text-slate-400' : 'text-gray-600'}>{t('encoding')}:</span>
+                      <span className={`ml-2 font-mono ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>UTF-8</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-gray-900 mb-2">{t('supportedTools')}</h4>
+                  <div className={`border rounded-lg p-4 ${isDarkMode ? 'border-slate-600 bg-slate-800' : 'border-gray-200 bg-white'}`}>
+                    <h4 className={`font-semibold mb-2 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('supportedTools')}</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span>Swagger UI - {t('apiDocumentationUI')}</span>
+                        <span className={isDarkMode ? 'text-slate-300' : 'text-gray-700'}>Swagger UI - {t('apiDocumentationUI')}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span>Postman - {t('apiTestingTool')}</span>
+                        <span className={isDarkMode ? 'text-slate-300' : 'text-gray-700'}>Postman - {t('apiTestingTool')}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span>Insomnia - {t('restClient')}</span>
+                        <span className={isDarkMode ? 'text-slate-300' : 'text-gray-700'}>Insomnia - {t('restClient')}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span>OpenAPI Generator - {t('codeGeneration')}</span>
+                        <span className={isDarkMode ? 'text-slate-300' : 'text-gray-700'}>OpenAPI Generator - {t('codeGeneration')}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-gray-900 mb-2">{t('usageMethod')}</h4>
+                  <div className={`border rounded-lg p-4 ${isDarkMode ? 'border-slate-600 bg-slate-800' : 'border-gray-200 bg-white'}`}>
+                    <h4 className={`font-semibold mb-2 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('usageMethod')}</h4>
                     <div className="space-y-3">
                       <div>
-                        <p className="text-sm text-gray-700 mb-2">1. {t('importInSwagger')}</p>
-                        <code className="block bg-gray-900 text-gray-100 p-2 rounded text-xs">
-                          {`https://editor.swagger.io/?url=${typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}/api/openapi`}
+                        <p className={`text-sm mb-2 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>1. {t('importInSwagger')}</p>
+                        <code className={`block p-2 rounded text-xs ${isDarkMode ? 'bg-slate-900 text-slate-200' : 'bg-gray-900 text-gray-100'}`}>
+                          {`https://editor.swagger.io/?url=${typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}/api/openapi?lang=${language}`}
                         </code>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-700 mb-2">2. {t('importInPostman')}</p>
-                        <code className="block bg-gray-900 text-gray-100 p-2 rounded text-xs">
-                          {`File → Import → Link → ${typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}/api/openapi`}
+                        <p className={`text-sm mb-2 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>2. {t('importInPostman')}</p>
+                        <code className={`block p-2 rounded text-xs ${isDarkMode ? 'bg-slate-900 text-slate-200' : 'bg-gray-900 text-gray-100'}`}>
+                          {`File → Import → Link → ${typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}/api/openapi?lang=${language}`}
                         </code>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-700 mb-2">3. {t('getCurlCommand')}</p>
-                        <code className="block bg-gray-900 text-gray-100 p-2 rounded text-xs">
-                          {`curl -X GET ${typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}/api/openapi`}
+                        <p className={`text-sm mb-2 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>3. {t('getCurlCommand')}</p>
+                        <code className={`block p-2 rounded text-xs ${isDarkMode ? 'bg-slate-900 text-slate-200' : 'bg-gray-900 text-gray-100'}`}>
+                          {`curl -X GET "${typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}/api/openapi?lang=${language}"`}
                         </code>
                       </div>
                     </div>
                   </div>
 
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-gray-900 mb-2">{t('specFeatures')}</h4>
-                    <ul className="text-sm text-gray-700 space-y-1">
+                  <div className={`border rounded-lg p-4 ${isDarkMode ? 'border-slate-600 bg-slate-800' : 'border-gray-200 bg-white'}`}>
+                    <h4 className={`font-semibold mb-2 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('specFeatures')}</h4>
+                    <ul className={`text-sm space-y-1 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>
                       <li>• {t('completeApiEndpoints')}</li>
                       <li>• {t('detailedRequestResponse')}</li>
                       <li>• {t('parameterValidation')}</li>
@@ -1091,6 +1290,6 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
           )}
         </div>
       </div>
-    </div>
+    </dialog>
   )
 }

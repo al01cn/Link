@@ -29,6 +29,26 @@
   --shadow-glow: 0 0 0 3px rgba(77, 183, 255, 0.25);
 }
 
+/* 暗色模式 */
+.dark {
+  --color-primary: #60A5FA;
+  --color-primary-hover: #3B82F6;
+  --color-primary-active: #2563EB;
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  --color-text-main: #F1F5F9;
+  --color-text-muted: #CBD5E1;
+  --color-bg-surface: #1E293B;
+
+  --shine-color: rgba(255, 255, 255, 0.1);
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 16px 32px rgba(0, 0, 0, 0.45);
+  --shadow-glow: 0 0 0 3px rgba(96, 165, 250, 0.4);
+}
+
 body {
   background-color: var(--color-bg-surface);
   color: var(--color-text-main);
@@ -43,6 +63,16 @@ body {
 
 .animate-fade-in {
   animation: fadeIn 0.5s var(--ease-spring) forwards;
+}
+
+/* 隐藏滚动条样式 */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
 }
 
 /* Animate.css 兼容类 */
@@ -191,16 +221,41 @@ body {
   transform: translateY(-1px);
 }
 
+/* 暗色模式输入框样式 */
+.dark .cute-input-wrapper {
+  border-color: #64748B;
+  background-color: #1e293b; /* slate-800 */
+}
+
+.dark .cute-input-wrapper:focus-within {
+  border-color: var(--color-primary);
+  background-color: #1e293b; /* slate-800 */
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-1px);
+}
+
 /* 卡片样式 */
 .cute-card {
   background: white;
   border-radius: var(--radius-lg);
   transition: transform 0.3s var(--ease-spring), box-shadow 0.3s var(--ease-spring);
   border: 1px solid #F1F5F9;
+  box-shadow: 0 25px 50px -12px rgba(77, 183, 255, 0.15); /* 输入卡片的蓝色阴影 */
 }
 .cute-card:hover {
   transform: translateY(-4px);
   box-shadow: var(--shadow-md);
+}
+
+/* 暗色模式卡片样式 */
+.dark .cute-card {
+  background: #334155;
+  border-color: #475569;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); /* 暗色模式下的黑色阴影 */
+}
+
+.dark .cute-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); /* 减轻悬停阴影强度 */
 }
 
 /* 开关样式 */
@@ -221,10 +276,21 @@ body {
   background-color: #F0F9FF;
 }
 
+/* 暗色模式选项卡样式 */
+.dark .option-card.active {
+  background-color: #1E3A8A;
+  border-color: var(--color-primary);
+}
+
 /* 背景网格 */
 .preview-grid {
   background-image: radial-gradient(#E2E8F0 1px, transparent 1px);
   background-size: 24px 24px;
+}
+
+/* 暗色模式背景网格 */
+.dark .preview-grid {
+  background-image: radial-gradient(#475569 1px, transparent 1px);
 }
 
 button:hover {
@@ -235,4 +301,78 @@ button:disabled {
 }
 a:hover{
   cursor: pointer;
+}
+
+/* 暗色模式全局样式优化 - 确保文本可见性 */
+
+/* 暗色模式下的边框颜色 */
+.dark .border-slate-100 {
+  border-color: #475569 !important;
+}
+
+.dark .border-slate-200 {
+  border-color: #64748B !important;
+}
+
+.dark .border-slate-300 {
+  border-color: #94A3B8 !important;
+}
+
+/* 暗色模式下的背景色 */
+.dark .bg-slate-50 {
+  background-color: #475569 !important;
+}
+
+.dark .bg-slate-100 {
+  background-color: #64748B !important;
+}
+
+.dark .bg-slate-200 {
+  background-color: #94A3B8 !important;
+}
+
+/* 暗色模式下的文本色 - 确保足够对比度 */
+.dark .text-slate-400 {
+  color: #CBD5E1 !important;
+}
+
+.dark .text-slate-500 {
+  color: #E2E8F0 !important;
+}
+
+.dark .text-slate-600 {
+  color: #F1F5F9 !important;
+}
+
+.dark .text-slate-700 {
+  color: #F8FAFC !important;
+}
+
+.dark .text-slate-800 {
+  color: #FFFFFF !important;
+}
+
+/* 暗色模式下的悬停效果 */
+.dark .hover\:bg-slate-50:hover {
+  background-color: #64748B !important;
+}
+
+.dark .hover\:bg-slate-100:hover {
+  background-color: #94A3B8 !important;
+}
+
+.dark .hover\:bg-slate-200:hover {
+  background-color: #CBD5E1 !important;
+}
+
+.dark .hover\:text-slate-500:hover {
+  color: #F1F5F9 !important;
+}
+
+.dark .hover\:text-slate-600:hover {
+  color: #F8FAFC !important;
+}
+
+.dark .hover\:text-slate-700:hover {
+  color: #FFFFFF !important;
 }

@@ -132,14 +132,14 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
         className="backdrop:bg-black/50 bg-transparent p-4 rounded-2xl"
         onClick={handleBackdropClick}
       >
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate__animated animate__fadeIn">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md animate__animated animate__fadeIn">
           <div className="p-8 text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="text-green-600" size={24} />
+            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="text-green-600 dark:text-green-400" size={24} />
             </div>
-            <h2 className="text-2xl font-bold text-slate-800 mb-2">{t('modifySuccess')}</h2>
-            <p className="text-slate-500 text-sm mb-6">{t('adminInfoUpdated')}</p>
-            <div className="w-8 h-8 border-2 border-green-300 border-t-green-600 rounded-full animate-spin mx-auto"></div>
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">{t('modifySuccess')}</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">{t('adminInfoUpdated')}</p>
+            <div className="w-8 h-8 border-2 border-green-300 dark:border-green-600 border-t-green-600 dark:border-t-green-400 rounded-full animate-spin mx-auto"></div>
           </div>
         </div>
       </dialog>
@@ -152,13 +152,13 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
       className="backdrop:bg-black/50 bg-transparent p-4 rounded-2xl"
       onClick={handleBackdropClick}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate__animated animate__fadeIn">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md animate__animated animate__fadeIn">
         <div className="p-8">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-slate-800">{t('adminSettings')}</h2>
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{t('adminSettings')}</h2>
             <button
               onClick={handleClose}
-              className="p-2 hover:bg-slate-100 rounded-full text-slate-400"
+              className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full text-slate-400 dark:text-slate-500"
               disabled={isLoading}
             >
               <X size={20} />
@@ -167,30 +167,30 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2 text-red-700 text-sm">
+              <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-600 rounded-lg p-3 flex items-center gap-2 text-red-700 dark:text-red-400 text-sm">
                 <AlertCircle size={16} />
                 {error}
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 {t('currentPassword')} <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
                 <input
                   type={showPasswords.current ? 'text' : 'password'}
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full pl-10 pr-12 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+                  className="w-full pl-10 pr-12 py-3 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
                   placeholder={t('enterCurrentPassword')}
                   disabled={isLoading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
                   disabled={isLoading}
                 >
                   {showPasswords.current ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -199,16 +199,16 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 {t('newUsername')} <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
                 <input
                   type="text"
                   value={newUsername}
                   onChange={(e) => setNewUsername(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+                  className="w-full pl-10 pr-4 py-3 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
                   placeholder={t('enterNewUsername')}
                   disabled={isLoading}
                 />
@@ -216,23 +216,23 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 {t('newPassword')} <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
                 <input
                   type={showPasswords.new ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full pl-10 pr-12 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+                  className="w-full pl-10 pr-12 py-3 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
                   placeholder={t('enterNewPassword')}
                   disabled={isLoading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
                   disabled={isLoading}
                 >
                   {showPasswords.new ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -241,23 +241,23 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 {t('confirmNewPassword')} <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
                 <input
                   type={showPasswords.confirm ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full pl-10 pr-12 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+                  className="w-full pl-10 pr-12 py-3 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
                   placeholder={t('enterNewPasswordAgain')}
                   disabled={isLoading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
                   disabled={isLoading}
                 >
                   {showPasswords.confirm ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -269,7 +269,7 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
               <button
                 type="button"
                 onClick={handleClose}
-                className="flex-1 py-3 px-4 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors font-medium"
+                className="flex-1 py-3 px-4 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors font-medium"
                 disabled={isLoading}
               >
                 {t('cancel')}
@@ -277,7 +277,7 @@ export default function AdminSettings({ onClose }: AdminSettingsProps) {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="flex-1 py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
+                className="flex-1 py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
               >
                 {isLoading ? (
                   <>

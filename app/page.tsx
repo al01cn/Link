@@ -6,8 +6,10 @@ import HomeView from '@/components/HomeView'
 import SafeRedirectView from '@/components/SafeRedirectView'
 import SettingsView from '@/components/SettingsView'
 import AdminLoginPage from '@/components/AdminLoginPage'
+import DynamicMetadata from '@/components/DynamicMetadata'
 import { AdminProvider, useAdmin } from '@/lib/AdminContext'
 import { LanguageProvider, useLanguage } from '@/lib/LanguageContext'
+import { ThemeProvider } from '@/lib/ThemeContext'
 import { useNotificationDialog } from '@/lib/useDialog'
 import { requestCache } from '@/lib/requestCache'
 import NotificationDialog from '@/components/NotificationDialog'
@@ -20,6 +22,7 @@ interface ShortLink {
   title?: string
   views: number
   createdAt: string
+  expiresAt?: string // 添加过期时间字段
   hasPassword: boolean
   requireConfirm: boolean
   enableIntermediate: boolean
@@ -33,7 +36,9 @@ function HomeContent() {
   const [settings, setSettings] = useState({
     mode: 'blacklist' as 'whitelist' | 'blacklist',
     waitTime: 3,
-    captchaEnabled: false
+    captchaEnabled: false,
+    preloadEnabled: true, // 默认启用预加载
+    autoFillPasswordEnabled: true // 默认启用密码自动填充
   })
   const [isProcessing, setIsProcessing] = useState(false)
   
@@ -46,19 +51,35 @@ function HomeContent() {
     
     const loadSettings = async () => {
       try {
+        const token = typeof window !== 'undefined' ? sessionStorage.getItem('adminToken') : null
+        if (!token) {
+          console.error('未找到管理员token')
+          return
+        }
+
         const data = await requestCache.get('settings', async () => {
-          const response = await fetch('/api/settings')
+          const response = await fetch('/api/settings', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
           if (response.ok) {
             return response.json()
+          }
+          if (response.status === 401) {
+            console.error('管理员权限已过期')
+            return null
           }
           throw new Error('加载设置失败')
         })
         
-        if (isMounted) {
+        if (isMounted && data) {
           setSettings({
             mode: data.securityMode || 'blacklist',
             waitTime: data.waitTime || 3,
-            captchaEnabled: data.captchaEnabled || false
+            captchaEnabled: data.captchaEnabled || false,
+            preloadEnabled: data.preloadEnabled !== false, // 默认启用
+            autoFillPasswordEnabled: data.autoFillPasswordEnabled !== false // 默认启用
           })
         }
       } catch (error) {
@@ -83,6 +104,14 @@ function HomeContent() {
 
   // 模拟访问短链
   const handleSimulateVisit = (link: ShortLink) => {
+    // 检查是否过期
+    if (link.expiresAt && new Date(link.expiresAt) <= new Date()) {
+      // 过期链接仍然跳转到安全页面显示过期信息
+      setRedirectTarget(link)
+      setCurrentView('redirect')
+      return
+    }
+    
     // 逻辑：
     // 1. 有密码 或 需要确认 或 启用过渡页 -> 跳转到安全页面
     // 2. 否则直接跳转
@@ -132,7 +161,10 @@ function HomeContent() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ password })
+        body: JSON.stringify({ 
+          password,
+          isAutoFill: false // 主页组件中的密码都是手动输入
+        })
       })
 
       if (response.ok) {
@@ -177,7 +209,10 @@ function HomeContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[--color-bg-surface] preview-grid">
+    <div className="min-h-screen bg-(--color-bg-surface) preview-grid">
+      {/* 动态更新页面元数据 */}
+      <DynamicMetadata />
+      
       <Navbar 
         onViewChange={setCurrentView} 
         currentView={currentView} 
@@ -191,14 +226,13 @@ function HomeContent() {
           <HomeView onSimulateVisit={handleSimulateVisit} t={t} />
         )}
         
-        {currentView === 'settings' && (
-          <SettingsView 
-            onClose={() => setCurrentView('home')} 
-            settings={settings}
-            setSettings={setSettings}
-            t={t}
-          />
-        )}
+        <SettingsView 
+          isOpen={currentView === 'settings'}
+          onClose={() => setCurrentView('home')} 
+          settings={settings}
+          setSettings={setSettings}
+          t={t}
+        />
 
         {currentView === 'redirect' && redirectTarget && (
           <SafeRedirectView 
@@ -208,15 +242,18 @@ function HomeContent() {
             requireConfirm={redirectTarget.requireConfirm}
             waitTime={settings.waitTime}
             captchaEnabled={settings.captchaEnabled}
+            preloadEnabled={settings.preloadEnabled}
+            autoFillPasswordEnabled={settings.autoFillPasswordEnabled}
             onProceed={handleProceed}
             onCancel={handleCancel}
             t={t}
+            expiresAt={redirectTarget.expiresAt}
           />
         )}
       </main>
 
       {/* 页脚 */}
-      <footer className="text-center py-8 text-slate-400 text-sm">
+      <footer className="text-center py-8 text-slate-400 dark:text-slate-500 text-sm">
         <p>{t('footer')}</p>
       </footer>
 
@@ -235,10 +272,12 @@ function HomeContent() {
 
 export default function Home() {
   return (
-    <LanguageProvider>
-      <AdminProvider>
-        <HomeContent />
-      </AdminProvider>
-    </LanguageProvider>
+    <ThemeProvider>
+      <LanguageProvider>
+        <AdminProvider>
+          <HomeContent />
+        </AdminProvider>
+      </LanguageProvider>
+    </ThemeProvider>
   )
 }

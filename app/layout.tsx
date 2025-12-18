@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { defaultMetadata } from "@/lib/metadata";
+import { ThemeProvider } from "@/lib/ThemeContext";
 
-export const metadata: Metadata = {
-  title: "ShortLink - Simple & Secure URL Shortener",
-  description: "Simple, secure, and powerful link shortening tool",
-};
+// 使用默认的中文元数据，客户端会根据语言偏好动态更新
+export const metadata: Metadata = defaultMetadata;
 
 export default function RootLayout({
   children,
@@ -12,7 +12,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
+    <html>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -27,7 +27,9 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased" suppressHydrationWarning={true}>
-        {children}
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

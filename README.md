@@ -1,209 +1,158 @@
-# ShortLink - 短链服务
+# 灵狼Link - 简单好用的短链服务
 
-简单、安全、强大的短链生成工具。基于 Next.js 14 + Prisma + SQLite 构建。
+[English](./README_EN.md) | 中文
 
-## ✨ 功能特性
+🔗 **简单、安全、强大的短链生成工具**
 
-### 🔗 短链生成
-- 自动生成短链路径（Base62/NanoID）
-- 支持自定义短链路径
-- 自动抓取目标页面标题
-- 访问统计和日志记录
+基于 Next.js 16 + Prisma + SQLite 构建的现代化短链服务，支持密码保护、域名管理、访问统计等功能。
 
-### 🛡️ 安全功能
-- 密码保护短链
-- 二次确认跳转
-- 安全过渡页面
-- 白名单/黑名单域名管理
-- 防钓鱼提示
+## ✨ 核心特性
 
-### ⚡ 跳转模式
-- **直接跳转**：无中间页面，直接302重定向
-- **过渡页面**：显示目标信息，自动倒计时跳转
-- **手动确认**：需要用户手动点击确认
-- **快速跳转**：`/to?url=` 模式，临时安全跳转
+- 🔗 **智能短链生成** - 自动生成或自定义路径，支持批量管理
+- 🛡️ **安全防护** - 密码保护、域名白名单、二次确认机制
+- ⚡ **多种跳转模式** - 直接跳转、过渡页面、手动确认、临时跳转
+- 📊 **数据分析** - 访问统计、日志记录、趋势分析
+- 🎨 **现代界面** - 响应式设计、中英双语、暗色主题
 
-### 📊 管理功能
-- 短链列表管理
-- 访问统计查看
-- 批量操作支持
-- 过期时间设置
-
-## 🚀 快速开始
+## � 快速安开始
 
 ### 环境要求
-- Node.js 18+
-- Bun (推荐) 或 npm/yarn
+- Node.js 18.0+
+- Bun 1.0+ (推荐) 或 npm/yarn
 
-### 安装步骤
+### 安装部署
 
-1. **克隆项目**
+**1. 克隆项目**
 ```bash
-git clone <repository-url>
-cd shortlink
+# GitHub (国际站)
+git clone https://github.com/al01cn/Link.git
+
+# Gitee (国内站) 
+git clone https://gitee.com/al01/Link.git
+
+# GitCode (国内站)
+git clone https://gitcode.com/al01cn/Link.git
+
+cd Link
 ```
 
-2. **安装依赖**
+**2. 安装依赖**
 ```bash
 bun install
 ```
 
-3. **环境配置**
+**3. 环境配置**
 ```bash
 cp .env.example .env.local
 # 编辑 .env.local 配置数据库和应用URL
 ```
 
-4. **初始化数据库**
+**4. 初始化数据库**
 ```bash
 bun run setup
 ```
 
-5. **启动开发服务器**
+**5. 启动服务**
 ```bash
+# 开发模式
 bun run dev
+
+# 生产模式
+bun run build && bun run start
 ```
 
-访问 [http://localhost:3000](http://localhost:3000) 开始使用。
+访问 [http://localhost:3000](http://localhost:3000) 开始使用！
 
-## 📁 项目结构
+### 默认管理员账户
+- **用户名**: `Loooong`
+- **密码**: `Loooong123`
 
-```
-├── app/                    # Next.js App Router
-│   ├── api/               # API 路由
-│   │   ├── links/         # 短链管理 API
-│   │   ├── visit/         # 访问统计 API
-│   │   └── to/            # 快速跳转 API
-│   ├── [path]/            # 短链访问页面
-│   ├── to/                # 快速跳转页面
-│   └── page.tsx           # 主页
-├── components/            # React 组件
-│   ├── Navbar.tsx         # 导航栏
-│   ├── HomeView.tsx       # 主页视图
-│   ├── SafeRedirectView.tsx # 安全跳转页面
-│   └── SettingsView.tsx   # 设置页面
-├── lib/                   # 工具库
-│   ├── db.ts              # 数据库连接
-│   └── utils.ts           # 工具函数
-├── prisma/                # 数据库配置
-│   └── schema.prisma      # 数据模型
-└── scripts/               # 脚本文件
-    └── init-db.ts         # 数据库初始化
-```
+> ⚠️ 首次登录后系统会强制要求修改默认密码
 
-## 🛠️ 可用脚本
+## 🚀 部署指南
+
+### Vercel 部署
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fal01cn%2FLink)
+
+### Netlify 部署
+
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/al01cn/Link)
+
+### Docker 部署
 
 ```bash
-# 开发
-bun run dev              # 启动开发服务器
-bun run build            # 构建生产版本
-bun run start            # 启动生产服务器
+# 使用 Docker Compose
+docker-compose up -d
 
-# 数据库
-bun run db:generate      # 生成 Prisma 客户端
-bun run db:push          # 推送数据库模式
-bun run db:migrate       # 运行数据库迁移
-bun run db:studio        # 打开 Prisma Studio
-bun run db:init          # 初始化示例数据
-bun run db:reset         # 重置数据库
-
-# 一键设置
-bun run setup            # 生成客户端 + 推送模式 + 初始化数据
+# 初始化数据库
+docker-compose exec app bun run setup
 ```
 
-## 🔧 配置说明
+### 环境变量配置
 
-### 环境变量
 ```bash
-# 数据库连接
-DATABASE_URL="file:./dev.db"
+# 必需配置
+DATABASE_URL="file:./dev.db"                    # 数据库连接
+NEXT_PUBLIC_BASE_URL="http://localhost:3000"    # 应用URL
+ENCRYPTION_KEY="your-secret-key"                # 加密密钥
 
-# 应用基础URL
-NEXT_PUBLIC_BASE_URL="http://localhost:3000"
+# 可选配置
+NEXT_PUBLIC_TURNSTILE_SITE_KEY="your-site-key"  # Cloudflare验证
+TURNSTILE_SECRET_KEY="your-secret-key"
 ```
 
-### 数据库迁移到 PostgreSQL
-```bash
-# 1. 更新 .env.local
-DATABASE_URL="postgresql://username:password@localhost:5432/shortlink"
+## �️A 技术栈
 
-# 2. 更新 prisma/schema.prisma
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-# 3. 重新生成和迁移
-bun run db:generate
-bun run db:migrate
-```
+- **前端框架**: [Next.js 16](https://nextjs.org/) - React 全栈框架
+- **数据库**: [Prisma](https://prisma.io/) + SQLite/PostgreSQL - 现代数据库工具包
+- **样式**: [Tailwind CSS](https://tailwindcss.com/) - 实用优先的 CSS 框架
+- **图标**: [Lucide React](https://lucide.dev/) - 美观的图标库
+- **运行时**: [Bun](https://bun.sh/) - 快速的 JavaScript 运行时
+- **语言**: TypeScript - 类型安全的 JavaScript
 
 ## 📖 API 文档
 
-### 创建短链
-```bash
-POST /api/links
-Content-Type: application/json
+详细的 API 文档请查看：
+- [中文 API 文档](./API.md)
+- [English API Documentation](./API_EN.md)
 
-{
-  "originalUrl": "https://example.com",
-  "customPath": "custom", // 可选
-  "password": "secret",   // 可选
-  "requireConfirm": true, // 可选
-  "enableIntermediate": true // 可选
-}
-```
-
-### 获取短链列表
-```bash
-GET /api/links
-```
-
-### 访问短链
-```bash
-GET /{path}              # 直接访问短链
-POST /api/visit/{path}   # 验证密码并记录访问
-```
-
-### 快速跳转
-```bash
-GET /to?url=https://example.com
-```
-
-## 🎨 设计系统
-
-项目采用现代化的设计系统：
-- **颜色主题**：蓝色主色调 (#4DB7FF)
-- **字体**：Inter 字体家族
-- **动画**：Spring 缓动函数
-- **组件**：可爱风格的卡片和按钮
-- **图标**：Lucide React 图标库
-
-## 🚀 部署
-
-### Vercel 部署
-1. 推送代码到 GitHub
-2. 在 Vercel 导入项目
-3. 配置环境变量
-4. 部署完成
-
-### 自托管部署
-```bash
-# 构建项目
-bun run build
-
-# 启动生产服务器
-bun run start
-```
-
-## 🤝 贡献
+## 🤝 贡献指南
 
 欢迎提交 Issue 和 Pull Request！
 
+- 🐛 **问题反馈**: [GitHub Issues](https://github.com/al01cn/Link/issues)
+- 💬 **功能讨论**: [GitHub Discussions](https://github.com/al01cn/Link/discussions)
+- 🇨🇳 **国内用户**: [Gitee](https://gitee.com/al01/Link) | [GitCode](https://gitcode.com/al01cn/Link)
+
+## � 致谢证
+
+感谢以下开源项目：
+
+- [Next.js](https://nextjs.org/) - React 全栈框架
+- [Prisma](https://prisma.io/) - 现代数据库工具包
+- [Tailwind CSS](https://tailwindcss.com/) - 实用优先的 CSS 框架
+- [Lucide React](https://lucide.dev/) - 美观的图标库
+- [Bun](https://bun.sh/) - 快速的 JavaScript 运行时
+
 ## 📄 许可证
 
-MIT License
+本项目采用 [MIT 许可证](LICENSE)。
 
 ---
 
-**ShortLink** - 让长链接变短，让分享更简单 ✨
+<div align="center">
+
+### 📦 开源仓库
+
+| 平台 | 链接 | 说明 |
+|------|------|------|
+| **GitHub** | [al01cn/Link](https://github.com/al01cn/Link) | 国际站，功能最新 |
+| **Gitee** | [al01/Link](https://gitee.com/al01/Link) | 国内镜像，访问更快 |
+| **GitCode** | [al01cn/Link](https://gitcode.com/al01cn/Link) | 国内镜像，备用选择 |
+
+**灵狼Link** - 让长链接变短，让分享更简单 ✨
+
+[🐛 问题反馈](https://github.com/al01cn/Link/issues) • [💬 功能讨论](https://github.com/al01cn/Link/discussions) • [📖 API文档](./API.md) • [🌍 English](./README_EN.md)
+
+</div>

@@ -2,11 +2,14 @@
 export const translations = {
   zh: {
     // 应用标题
-    appTitle: 'ShortLink',
+    appTitle: '灵狼Link',
     
     // 导航栏
     settings: '设置',
     switchLanguage: '切换语言',
+    github: 'GitHub',
+    gitee: 'Gitee',
+    sourceCode: '源码',
     
     // 主页
     heroTitle: '让你的长链接变',
@@ -36,7 +39,7 @@ export const translations = {
     noLinksDesc: '在上方输入长链接开始使用吧',
     
     // 安全跳转页面
-    leaving: '即将离开 ShortLink',
+    leaving: '即将离开 灵狼Link',
     leavingDesc: '正在前往外部链接，请确认链接安全性。',
     targetUrl: '目标链接',
     passwordProtected: '此链接受密码保护',
@@ -72,6 +75,13 @@ export const translations = {
     captchaFailed: '人机验证失败，请重试',
     captchaExpired: '人机验证已过期，请重新验证',
 
+    // 预加载设置
+    preloadSettings: '预加载设置',
+    enablePreload: '启用链接预加载',
+    disablePreload: '关闭链接预加载',
+    preloadDesc: '在跳转页面提前预加载目标链接，加快访问速度。',
+    preloadOffDesc: '关闭后不会预加载目标链接，节省带宽。',
+
     add: '添加',
     
     // 错误信息
@@ -82,7 +92,7 @@ export const translations = {
     networkError: '网络错误，请重试',
     
     // 页脚
-    footer: '© 2024 ShortLink. 简单、安全、快速。',
+    footer: '© 2024 灵狼Link. 简单、安全、快速。 | Powered by 灵狼AL01',
     
     // 404页面
     notFound: '短链不存在',
@@ -108,6 +118,18 @@ export const translations = {
     pleaseEnterUsernamePassword: '请输入用户名和密码',
     defaultAccount: '默认账户',
     defaultAccountWarning: '检测到您使用的是默认账户，建议在管理员设置中修改账号密码以确保安全。',
+    
+    // 强制修改密码对话框
+    securityWarning: '安全警告',
+    defaultPasswordRisk: '检测到您正在使用默认管理员账号密码，这存在严重的安全风险。为了保护您的系统安全，请立即修改管理员账号和密码。',
+    forcePasswordChange: '强制修改密码',
+    cannotCloseDialog: '此对话框无法关闭，只有修改密码后才能继续使用系统',
+    securityRecommendations: '安全建议：',
+    useStrongPassword: '使用强密码，包含字母、数字和特殊字符',
+    avoidEasyGuess: '不要使用容易猜测的用户名和密码',
+    regularlyChange: '定期更换管理员密码',
+    changePasswordNow: '立即修改密码',
+    changingPassword: '修改中...',
     
     // 表单验证
     pleaseEnterUrl: '请输入链接地址',
@@ -470,6 +492,18 @@ export const translations = {
     apiLinkExpired: '短链已过期',
     apiInvalidIdFormat: '无效的ID格式或存在关联数据',
     apiDomainRuleNotFound: '域名规则不存在',
+    
+    // 过期相关翻译
+    linkExpired: '链接已过期',
+    linkExpiredDesc: '此短链已过期，无法继续访问。',
+    linkExpiredWithTime: '此短链已于 {time} 过期，无法继续访问。',
+    expiredFilter: '已过期',
+    activeFilter: '有效链接',
+    expiresIn: '{time}后过期',
+    imminentExpiry: '即将过期',
+    expireTime: '过期时间',
+    closeWindow: '关闭窗口',
+    autoCloseIn: '{seconds}秒后自动关闭',
     apiPasswordRequired: '密码错误',
     apiProcessingSuccess: '处理成功',
     apiModifySuccess: '修改成功',
@@ -478,7 +512,39 @@ export const translations = {
     // API 参数描述
     originalUrlDesc: '原始URL地址',
     customPathDesc: '自定义短链路径',
-    passwordDesc: '访问密码',
+    passwordDesc: '访问密码（明文，系统会自动加密存储）',
+    isAutoFillDesc: '是否为自动填充模式（pwd参数传递时为true，手动输入时为false）',
+    pwdParamDesc: '密码自动填充参数，支持明文密码和加密字符串两种格式',
+    passwordAutoFill: '密码自动填充',
+    passwordAutoFillDesc: '密码自动填充功能允许通过 URL 参数传递密码，实现自动填充和验证，支持明文密码和加密字符串两种格式。',
+    featureOverview: '功能概述',
+    passwordAutoFillOverview: '密码自动填充功能提供了两种不同的验证模式，以适应不同的使用场景和安全需求。',
+    manualInputMode: '手动输入模式',
+    manualInputModeDesc: '用户在中间页手动输入明文密码进行验证',
+    autoFillMode: '自动填充模式',
+    autoFillModeDesc: '通过 pwd 参数传递密码，支持明文和加密字符串',
+    plainTextPassword: '明文密码传递',
+    plainTextPasswordDesc: '直接在 URL 中传递明文密码，适用于内部系统或可信环境。',
+    encryptedPassword: '加密密码传递',
+    encryptedPasswordDesc: '传递加密后的密码字符串，提供更高的安全性。',
+    apiParameters: 'API 参数',
+    verificationProcess: '验证流程',
+    step1GetPwdParam: '系统从 URL 中获取 pwd 参数',
+    step2AutoFillPassword: '自动填充到密码输入框',
+    step3SmartVerification: '智能识别明文密码或加密字符串并进行验证',
+    step4AutoSubmit: '如果启用自动填充功能，自动提交验证',
+    securityFeatures: '安全特性',
+    manualInputProtection: '手动输入保护',
+    manualInputProtectionDesc: '手动输入模式只接受明文密码，防止误用加密字符串',
+    smartRecognition: '智能识别',
+    smartRecognitionDesc: '自动填充模式智能识别密码格式并采用相应验证策略',
+    encryptedTransmission: '加密传输',
+    encryptedTransmissionDesc: '建议使用 HTTPS 协议传输密码，确保传输安全',
+    backwardCompatibility: '向后兼容',
+    backwardCompatibilityDesc: '兼容旧的明文密码存储格式，平滑升级',
+    configurationOptions: '配置选项',
+    configurationOptionsDesc: '可以通过系统设置 API 控制密码自动填充功能的启用状态：',
+    enableDisableAutoFill: '启用/禁用自动填充',
     expiresAtDesc: '过期时间 (ISO 8601)',
     requireConfirmDesc: '是否需要确认跳转',
     enableIntermediateDesc: '是否启用中间页',
@@ -565,16 +631,37 @@ export const translations = {
     
     // 链接相关错误
     customPathExists: '自定义路径已存在',
-    linkAlreadyExists: '该链接已存在短链'
+    linkAlreadyExists: '该链接已存在短链',
+    
+    // 防止使用默认凭据的错误提示
+    cannotUseDefaultCredentials: '不能使用默认的管理员账号和密码，请设置不同的凭据以确保安全',
+    cannotUseDefaultUsername: '不能使用默认用户名 "Loooong"，请选择其他用户名',
+    cannotUseDefaultPassword: '不能使用默认密码 "Loooong123"，请设置其他密码',
+    
+    // 密码自动填充设置
+    autoFillPasswordSettings: '密码自动填充',
+    enableAutoFillPassword: '启用密码自动填充',
+    disableAutoFillPassword: '关闭密码自动填充',
+    autoFillPasswordDesc: '启用后，访问带有pwd参数的短链时自动填入密码并验证。',
+    autoFillPasswordOffDesc: '关闭后，忽略pwd参数，只能手动填写密码。',
+    
+    // 主题切换
+    lightMode: '亮色模式',
+    darkMode: '暗色模式',
+    systemMode: '跟随系统',
+    timeMode: '跟随时间'
   },
   
   en: {
     // 应用标题
-    appTitle: 'ShortLink',
+    appTitle: 'AL01 Link',
     
     // 导航栏
     settings: 'Settings',
     switchLanguage: 'Switch Language',
+    github: 'GitHub',
+    gitee: 'Gitee',
+    sourceCode: 'Source Code',
     
     // 主页
     heroTitle: 'Shorten Your ',
@@ -604,7 +691,7 @@ export const translations = {
     noLinksDesc: 'Enter a long URL above to get started',
     
     // 安全跳转页面
-    leaving: 'Leaving ShortLink',
+    leaving: 'Leaving AL01 Link',
     leavingDesc: 'Heading to an external link. Please verify the link safety.',
     targetUrl: 'Target URL',
     passwordProtected: 'Password Protected',
@@ -640,6 +727,13 @@ export const translations = {
     captchaFailed: 'CAPTCHA verification failed, please try again',
     captchaExpired: 'CAPTCHA verification expired, please verify again',
 
+    // 预加载设置
+    preloadSettings: 'Preload Settings',
+    enablePreload: 'Enable Link Preload',
+    disablePreload: 'Disable Link Preload',
+    preloadDesc: 'Preload target links on redirect pages to speed up access.',
+    preloadOffDesc: 'Disable preloading to save bandwidth.',
+
     add: 'Add',
     
     // 错误信息
@@ -650,7 +744,7 @@ export const translations = {
     networkError: 'Network error, please retry',
     
     // 页脚
-    footer: '© 2024 ShortLink. Simple. Secure. Fast.',
+    footer: '© 2024 AL01 Link. Simple. Secure. Fast. | Powered by AL01 Link',
     
     // 404页面
     notFound: 'Link Not Found',
@@ -676,6 +770,18 @@ export const translations = {
     pleaseEnterUsernamePassword: 'Please enter username and password',
     defaultAccount: 'Default Account',
     defaultAccountWarning: 'Default account detected. It is recommended to change the account and password in admin settings for security.',
+    
+    // 强制修改密码对话框
+    securityWarning: 'Security Warning',
+    defaultPasswordRisk: 'You are using the default admin account and password, which poses serious security risks. To protect your system, please change the admin account and password immediately.',
+    forcePasswordChange: 'Force Password Change',
+    cannotCloseDialog: 'This dialog cannot be closed. You can only continue using the system after changing the password.',
+    securityRecommendations: 'Security Recommendations:',
+    useStrongPassword: 'Use strong passwords with letters, numbers and special characters',
+    avoidEasyGuess: 'Do not use easily guessable usernames and passwords',
+    regularlyChange: 'Change admin password regularly',
+    changePasswordNow: 'Change Password Now',
+    changingPassword: 'Changing...',
     
     // 表单验证
     pleaseEnterUrl: 'Please enter URL',
@@ -1038,6 +1144,18 @@ export const translations = {
     apiLinkExpired: 'Short link expired',
     apiInvalidIdFormat: 'Invalid ID format or associated data exists',
     apiDomainRuleNotFound: 'Domain rule not found',
+    
+    // 过期相关翻译
+    linkExpired: 'Link Expired',
+    linkExpiredDesc: 'This short link has expired and cannot be accessed.',
+    linkExpiredWithTime: 'This short link expired on {time} and cannot be accessed.',
+    expiredFilter: 'Expired',
+    activeFilter: 'Active Links',
+    expiresIn: 'Expires in {time}',
+    imminentExpiry: 'Expiring soon',
+    expireTime: 'Expiration Time',
+    closeWindow: 'Close Window',
+    autoCloseIn: 'Auto close in {seconds}s',
     apiPasswordRequired: 'Password error',
     apiProcessingSuccess: 'Processing successful',
     apiModifySuccess: 'Modification successful',
@@ -1046,7 +1164,39 @@ export const translations = {
     // API 参数描述
     originalUrlDesc: 'Original URL address',
     customPathDesc: 'Custom short link path',
-    passwordDesc: 'Access password',
+    passwordDesc: 'Access password (plain text, system will encrypt and store automatically)',
+    isAutoFillDesc: 'Whether it is auto-fill mode (true when passed via pwd parameter, false when manually entered)',
+    pwdParamDesc: 'Password auto-fill parameter, supports both plain text and encrypted string formats',
+    passwordAutoFill: 'Password Auto-Fill',
+    passwordAutoFillDesc: 'Password auto-fill feature allows passing passwords via URL parameters for automatic filling and verification, supporting both plain text and encrypted string formats.',
+    featureOverview: 'Feature Overview',
+    passwordAutoFillOverview: 'Password auto-fill feature provides two different verification modes to adapt to different usage scenarios and security requirements.',
+    manualInputMode: 'Manual Input Mode',
+    manualInputModeDesc: 'Users manually enter plain text passwords on the intermediate page for verification',
+    autoFillMode: 'Auto-Fill Mode',
+    autoFillModeDesc: 'Pass passwords via pwd parameter, supports both plain text and encrypted strings',
+    plainTextPassword: 'Plain Text Password',
+    plainTextPasswordDesc: 'Pass plain text passwords directly in URL, suitable for internal systems or trusted environments.',
+    encryptedPassword: 'Encrypted Password',
+    encryptedPasswordDesc: 'Pass encrypted password strings for higher security.',
+    apiParameters: 'API Parameters',
+    verificationProcess: 'Verification Process',
+    step1GetPwdParam: 'System retrieves pwd parameter from URL',
+    step2AutoFillPassword: 'Automatically fill into password input field',
+    step3SmartVerification: 'Intelligently recognize plain text or encrypted string and verify accordingly',
+    step4AutoSubmit: 'Automatically submit verification if auto-fill is enabled',
+    securityFeatures: 'Security Features',
+    manualInputProtection: 'Manual Input Protection',
+    manualInputProtectionDesc: 'Manual input mode only accepts plain text passwords, preventing misuse of encrypted strings',
+    smartRecognition: 'Smart Recognition',
+    smartRecognitionDesc: 'Auto-fill mode intelligently recognizes password format and applies corresponding verification strategy',
+    encryptedTransmission: 'Encrypted Transmission',
+    encryptedTransmissionDesc: 'Recommend using HTTPS protocol for password transmission to ensure security',
+    backwardCompatibility: 'Backward Compatibility',
+    backwardCompatibilityDesc: 'Compatible with legacy plain text password storage format for smooth upgrade',
+    configurationOptions: 'Configuration Options',
+    configurationOptionsDesc: 'You can control the password auto-fill feature status through system settings API:',
+    enableDisableAutoFill: 'Enable/Disable Auto-Fill',
     expiresAtDesc: 'Expiration time (ISO 8601)',
     requireConfirmDesc: 'Whether confirmation is required for redirect',
     enableIntermediateDesc: 'Whether to enable intermediate page',
@@ -1133,7 +1283,25 @@ export const translations = {
     
     // 链接相关错误
     customPathExists: 'Custom path already exists',
-    linkAlreadyExists: 'This link already has a short URL'
+    linkAlreadyExists: 'This link already has a short URL',
+    
+    // 防止使用默认凭据的错误提示
+    cannotUseDefaultCredentials: 'Cannot use default admin username and password, please set different credentials for security',
+    cannotUseDefaultUsername: 'Cannot use default username "Loooong", please choose a different username',
+    cannotUseDefaultPassword: 'Cannot use default password "Loooong123", please set a different password',
+    
+    // 密码自动填充设置
+    autoFillPasswordSettings: 'Auto-Fill Password',
+    enableAutoFillPassword: 'Enable Auto-Fill Password',
+    disableAutoFillPassword: 'Disable Auto-Fill Password',
+    autoFillPasswordDesc: 'When enabled, automatically fill and verify password when accessing short links with pwd parameter.',
+    autoFillPasswordOffDesc: 'When disabled, ignore pwd parameter and require manual password entry.',
+    
+    // 主题切换
+    lightMode: 'Light Mode',
+    darkMode: 'Dark Mode',
+    systemMode: 'Follow System',
+    timeMode: 'Follow Time'
   }
 }
 

@@ -60,7 +60,7 @@ export async function POST(
   try {
     const { path } = await params
     const body = await request.json()
-    const { password } = body
+    const { password, isAutoFill } = body // 添加 isAutoFill 参数来区分来源
 
     // 查找短链
     const shortLink = await prisma.shortLink.findUnique({
@@ -77,7 +77,7 @@ export async function POST(
     }
 
     // 验证密码
-    if (shortLink.password && !verifyPassword(password || '', shortLink.password)) {
+    if (shortLink.password && !verifyPassword(password || '', shortLink.password, isAutoFill)) {
       return NextResponse.json({ error: t('apiPasswordRequired') }, { status: 401 })
     }
 

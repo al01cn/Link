@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { translateForRequest } from '@/lib/translations'
+import { verifyAdminToken } from '@/lib/adminAuth'
 
 // UUID 验证函数
 function isValidUUID(uuid: string): boolean {
@@ -14,6 +15,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // 验证管理员权限
+    const adminPayload = verifyAdminToken(request)
+    if (!adminPayload) {
+      return NextResponse.json({ error: translateForRequest(request, 'apiAdminRequired') }, { status: 401 })
+    }
+
     // Next.js 16+ 中 params 是 Promise，需要 await
     const resolvedParams = await params
     const id = resolvedParams.id

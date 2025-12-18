@@ -37,6 +37,8 @@
     "react-dom": "19.2.1"
   },
   "devDependencies": {
+    "@iconify-json/simple-icons": "^1.2.63",
+    "@iconify/react": "^6.0.2",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",

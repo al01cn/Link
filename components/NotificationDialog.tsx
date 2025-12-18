@@ -102,14 +102,14 @@ export default function NotificationDialog({
       {/* 对话框容器 */}
       <div className="flex min-h-full items-center justify-center p-4">
         <div 
-          className={`relative bg-white rounded-lg shadow-xl max-w-md w-full mx-auto transform transition-all duration-300 ${
+          className={`relative bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full mx-auto transform transition-all duration-300 ${
             isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
           }`}
         >
           {/* 关闭按钮 */}
           <button
             onClick={handleClose}
-            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+            className="absolute top-4 right-4 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -124,10 +124,10 @@ export default function NotificationDialog({
               
               {/* 文本内容 */}
               <div className="flex-1">
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-slate-200 mb-2">
                   {title || getDefaultTitle()}
                 </h3>
-                <p className="text-sm text-gray-600 leading-relaxed">
+                <p className="text-sm text-gray-600 dark:text-slate-400 leading-relaxed">
                   {message}
                 </p>
               </div>

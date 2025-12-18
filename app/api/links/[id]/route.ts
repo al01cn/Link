@@ -52,6 +52,12 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // 验证管理员权限
+    const adminPayload = verifyAdminToken(request)
+    if (!adminPayload) {
+      return NextResponse.json({ error: translateForRequest(request, 'apiAdminRequired') }, { status: 401 })
+    }
+
     const { id } = await params
     
     // 验证UUID格式
@@ -166,6 +172,7 @@ export async function PUT(
       title: updatedLink.title,
       views: updatedLink.views,
       createdAt: updatedLink.createdAt,
+      expiresAt: updatedLink.expiresAt,
       hasPassword: !!updatedLink.password,
       requireConfirm: updatedLink.requireConfirm,
       enableIntermediate: updatedLink.enableIntermediate
@@ -183,6 +190,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // 验证管理员权限
+    const adminPayload = verifyAdminToken(request)
+    if (!adminPayload) {
+      return NextResponse.json({ error: translateForRequest(request, 'apiAdminRequired') }, { status: 401 })
+    }
+
     const { id } = await params
     
     // 验证UUID格式

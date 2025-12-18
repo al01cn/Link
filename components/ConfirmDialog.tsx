@@ -96,14 +96,14 @@ export default function ConfirmDialog({
       {/* 对话框容器 */}
       <div className="flex min-h-full items-center justify-center p-4">
         <div 
-          className={`relative bg-white rounded-lg shadow-xl max-w-md w-full mx-auto transform transition-all duration-300 ${
+          className={`relative bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full mx-auto transform transition-all duration-300 ${
             isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
           }`}
         >
           {/* 关闭按钮 */}
           <button
             onClick={handleClose}
-            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+            className="absolute top-4 right-4 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -119,11 +119,11 @@ export default function ConfirmDialog({
               {/* 文本内容 */}
               <div className="flex-1">
                 {title && (
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-slate-200 mb-2">
                     {title}
                   </h3>
                 )}
-                <p className="text-sm text-gray-600 leading-relaxed">
+                <p className="text-sm text-gray-600 dark:text-slate-400 leading-relaxed">
                   {message}
                 </p>
               </div>
@@ -133,7 +133,7 @@ export default function ConfirmDialog({
             <div className="flex justify-end space-x-3 mt-6">
               <button
                 onClick={handleClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md hover:bg-gray-50 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
               >
                 {cancelText || t('cancel')}
               </button>

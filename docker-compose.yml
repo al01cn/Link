@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:./dev.db
+      - NEXT_PUBLIC_BASE_URL=http://localhost:3000
+      - ENCRYPTION_KEY=your-secret-encryption-key-here
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+# 注释掉默认的 PostgreSQL 配置
+# 如需使用 PostgreSQL，请使用：docker-compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
+
+# volumes:
+#   postgres_data:

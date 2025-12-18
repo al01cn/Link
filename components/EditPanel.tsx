@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Link2, Lock, Shield, Zap, X, ExternalLink, Calendar, Save, AlertCircle } from 'lucide-react'
+import { Lock, Shield, Zap, ExternalLink, Calendar, Save, AlertCircle } from 'lucide-react'
 import { useLanguage } from '@/lib/LanguageContext'
 
 interface ShortLink {
@@ -12,6 +12,7 @@ interface ShortLink {
   title?: string
   views: number
   createdAt: string
+  expiresAt?: string
   hasPassword: boolean
   requireConfirm: boolean
   enableIntermediate: boolean
@@ -46,7 +47,17 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
       setPassword('') // 密码不显示，需要用户重新输入
       setRequireConfirm(link.requireConfirm)
       setEnableIntermediate(link.enableIntermediate)
-      setExpiresAt('')
+      // 设置现有的过期时间
+      if (link.expiresAt) {
+        const expireDate = new Date(link.expiresAt)
+        // 转换为本地时间格式 (YYYY-MM-DDTHH:mm)
+        const localDateTime = new Date(expireDate.getTime() - expireDate.getTimezoneOffset() * 60000)
+          .toISOString()
+          .slice(0, 16)
+        setExpiresAt(localDateTime)
+      } else {
+        setExpiresAt('')
+      }
       setErrors({})
     }
   }, [link, isExpanded])
@@ -58,6 +69,9 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
       setEnableIntermediate(true)
     }
   }, [password])
+
+  // 检查是否有密码保护（现有密码或新输入的密码）
+  const hasPasswordProtection = link.hasPassword || password.trim() !== ''
 
   // 表单验证
   const validateForm = () => {
@@ -104,8 +118,8 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
 
   // 处理自动跳转开关变化
   const handleEnableIntermediateChange = (enabled: boolean) => {
-    // 如果有密码，不允许禁用中间页
-    if (!enabled && password.trim()) {
+    // 如果有密码保护，不允许禁用中间页
+    if (!enabled && hasPasswordProtection) {
       return
     }
     setEnableIntermediate(enabled)
@@ -149,23 +163,23 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
       isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
     }`}>
       <div className="min-h-0">
-        <div className="border-t border-slate-100 p-4 bg-slate-50/50">
+        <div className="border-t border-slate-100 dark:border-slate-700 p-4">
           {/* 编辑表单 */}
           <div className="space-y-4">
             
             {/* 原始链接 */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 {t('originalUrl')} <span className="text-red-500">*</span>
               </label>
-              <div className={`cute-input-wrapper bg-white rounded-lg px-4 py-3 flex items-center gap-2 ${
-                errors.originalUrl ? 'border-red-300 ring-1 ring-red-300' : ''
+              <div className={`cute-input-wrapper bg-white dark:bg-slate-800 rounded-lg px-4 py-3 flex items-center gap-2 ${
+                errors.originalUrl ? 'border-red-300 dark:border-red-400' : ''
               }`}>
-                <ExternalLink size={18} className="text-slate-400" />
+                <ExternalLink size={18} className="text-slate-400 dark:text-slate-500" />
                 <input 
                   type="url" 
                   placeholder="https://example.com"
-                  className="w-full bg-transparent outline-none text-slate-800"
+                  className="w-full bg-transparent outline-none text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500"
                   value={originalUrl}
                   onChange={(e) => {
                     setOriginalUrl(e.target.value)
@@ -187,19 +201,19 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
             <div className="grid md:grid-cols-2 gap-4">
               {/* 自定义路径 */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   {t('customPath')}
                 </label>
-                <div className={`cute-input-wrapper bg-white rounded-lg px-4 py-3 flex items-center gap-2 ${
-                  errors.customPath ? 'border-red-300 ring-1 ring-red-300' : ''
+                <div className={`cute-input-wrapper bg-white dark:bg-slate-800 rounded-lg px-4 py-3 flex items-center gap-2 ${
+                  errors.customPath ? 'border-red-300 dark:border-red-400' : ''
                 }`}>
-                  <span className="text-slate-400 text-sm">
+                  <span className="text-slate-400 dark:text-slate-500 text-sm">
                     {process.env.NEXT_PUBLIC_BASE_URL?.replace(/^https?:\/\//, '') || 'localhost:3000'}/
                   </span>
                   <input 
                     type="text" 
                     placeholder={t('customPathPlaceholder')}
-                    className="w-full bg-transparent outline-none text-slate-800"
+                    className="w-full bg-transparent outline-none text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500"
                     value={customPath}
                     onChange={(e) => {
                       setCustomPath(e.target.value)
@@ -220,17 +234,17 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
 
               {/* 访问密码 */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   {t('accessPassword')}
                 </label>
-                <div className={`cute-input-wrapper bg-white rounded-lg px-4 py-3 flex items-center gap-2 ${
-                  errors.password ? 'border-red-300 ring-1 ring-red-300' : ''
+                <div className={`cute-input-wrapper bg-white dark:bg-slate-800 rounded-lg px-4 py-3 flex items-center gap-2 ${
+                  errors.password ? 'border-red-300 dark:border-red-400' : ''
                 }`}>
-                  <Lock size={18} className="text-slate-400" />
+                  <Lock size={18} className="text-slate-400 dark:text-slate-500" />
                   <input 
                     type="text" 
                     placeholder={t('setAccessPassword')}
-                    className="w-full bg-transparent outline-none text-slate-800"
+                    className="w-full bg-transparent outline-none text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500"
                     value={password}
                     onChange={(e) => {
                       setPassword(e.target.value)
@@ -257,16 +271,16 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
 
             {/* 过期时间 */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 {t('editPanelExpirationTime')}
               </label>
-              <div className={`cute-input-wrapper bg-white rounded-lg px-4 py-3 flex items-center gap-2 ${
-                errors.expiresAt ? 'border-red-300 ring-1 ring-red-300' : ''
+              <div className={`cute-input-wrapper bg-white dark:bg-slate-800 rounded-lg px-4 py-3 flex items-center gap-2 ${
+                errors.expiresAt ? 'border-red-300 dark:border-red-400' : ''
               }`}>
-                <Calendar size={18} className="text-slate-400" />
+                <Calendar size={18} className="text-slate-400 dark:text-slate-500" />
                 <input 
                   type="datetime-local" 
-                  className="w-full bg-transparent outline-none text-slate-800"
+                  className="w-full bg-transparent outline-none text-slate-800 dark:text-slate-200"
                   value={expiresAt}
                   onChange={(e) => {
                     setExpiresAt(e.target.value)
@@ -283,7 +297,7 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
                   {errors.expiresAt}
                 </p>
               )}
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 {t('leaveEmptyForNeverExpire')}
               </p>
             </div>
@@ -293,61 +307,73 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
               
               {/* 开启过渡页 */}
               <label className={`flex items-center justify-between p-3 rounded-lg border transition-colors group ${
-                password.trim() ? 'border-slate-200 bg-slate-50 cursor-not-allowed opacity-60' : 'border-slate-100 hover:bg-slate-50 cursor-pointer'
+                hasPasswordProtection ? 'border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 cursor-not-allowed opacity-60' : 'border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer'
               }`}>
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/50 text-blue-500 dark:text-blue-400 flex items-center justify-center">
                     <Zap size={16} />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-slate-700">{t('enableTransitionPage')}</span>
-                    <span className="text-xs text-slate-500">
-                      {password.trim() ? '设置密码时自动启用' : '显示跳转确认页面'}
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('enableTransitionPage')}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      {hasPasswordProtection ? '设置密码时自动启用' : '显示跳转确认页面'}
                     </span>
                   </div>
                 </div>
-                <div className="relative">
+                <div className="relative w-10 h-6">
                   <input 
                     type="checkbox" 
                     className="peer sr-only cute-switch-checkbox" 
                     checked={enableIntermediate} 
-                    disabled={password.trim() !== '' || isLoading}
+                    disabled={hasPasswordProtection || isLoading}
                     onChange={() => handleEnableIntermediateChange(!enableIntermediate)} 
                   />
-                  <div className={`w-10 h-6 rounded-full transition-colors ${
-                    password.trim() ? 'bg-slate-300' : 'bg-slate-200 peer-checked:bg-blue-500'
-                  }`}>
-                    <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4 shadow-sm"></div>
-                  </div>
+                  <div className={`w-full h-full rounded-full transition-colors ${
+                    hasPasswordProtection 
+                      ? 'bg-slate-300 dark:bg-slate-600' 
+                      : enableIntermediate 
+                        ? 'bg-[var(--color-primary)]' 
+                        : 'bg-slate-200 dark:bg-slate-600'
+                  }`}></div>
+                  <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${
+                    enableIntermediate ? 'translate-x-4' : 'translate-x-0'
+                  }`}></div>
                 </div>
               </label>
 
               {/* 强制二次确认 */}
               <label className={`flex items-center justify-between p-3 rounded-lg border transition-colors group ${
-                password.trim() ? 'border-orange-200 bg-orange-50' : 'border-slate-100 hover:bg-slate-50'
-              } cursor-pointer`}>
+                hasPasswordProtection ? 'border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 cursor-not-allowed opacity-60' : 'border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer'
+              }`}>
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-orange-50 dark:bg-orange-900/50 text-orange-500 dark:text-orange-400 flex items-center justify-center">
                     <Shield size={16} />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-slate-700">强制二次确认</span>
-                    <span className="text-xs text-slate-500">
-                      {password.trim() ? '设置密码时自动启用' : '需要用户确认'}
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">强制二次确认</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      {hasPasswordProtection ? '设置密码时自动启用' : '需要用户确认'}
                     </span>
                   </div>
                 </div>
-                <div className="relative">
+                <div className="relative w-10 h-6">
                   <input 
                     type="checkbox" 
                     className="peer sr-only cute-switch-checkbox" 
                     checked={requireConfirm} 
-                    disabled={isLoading}
+                    disabled={hasPasswordProtection || isLoading}
                     onChange={() => handleRequireConfirmChange(!requireConfirm)} 
                   />
-                  <div className="w-10 h-6 bg-slate-200 rounded-full transition-colors peer-checked:bg-blue-500">
-                    <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4 shadow-sm"></div>
-                  </div>
+                  <div className={`w-full h-full rounded-full transition-colors ${
+                    hasPasswordProtection 
+                      ? 'bg-slate-300 dark:bg-slate-600' 
+                      : requireConfirm 
+                        ? 'bg-[var(--color-primary)]' 
+                        : 'bg-slate-200 dark:bg-slate-600'
+                  }`}></div>
+                  <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${
+                    requireConfirm ? 'translate-x-4' : 'translate-x-0'
+                  }`}></div>
                 </div>
               </label>
 
@@ -358,7 +384,7 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
               <button 
                 onClick={onCancel}
                 disabled={isLoading}
-                className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg font-medium transition-colors disabled:opacity-50"
               >
                 取消
               </button>

@@ -87,7 +87,7 @@ export async function fetchPageTitle(url: string): Promise<string | null> {
   try {
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; ShortLink/1.0)'
+        'User-Agent': 'Mozilla/5.0 (compatible; AL01Link/1.0)'
       }
     })
     
@@ -119,6 +119,26 @@ export function formatTimeAgo(date: Date): string {
   return date.toLocaleDateString('zh-CN')
 }
 
+// 格式化剩余时间（用于过期时间显示）
+export function formatTimeRemaining(date: Date): { time: string; isImminentExpiry: boolean; isExpired: boolean } {
+  const now = new Date()
+  const diff = date.getTime() - now.getTime()
+  
+  // 如果已经过期，返回过期标识
+  if (diff <= 0) return { time: '', isImminentExpiry: false, isExpired: true }
+  
+  const minutes = Math.floor(diff / (1000 * 60))
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  
+  if (minutes < 1) return { time: '', isImminentExpiry: true, isExpired: false } // 即将过期的特殊情况
+  if (minutes < 60) return { time: `${minutes}分钟`, isImminentExpiry: false, isExpired: false }
+  if (hours < 24) return { time: `${hours}小时`, isImminentExpiry: false, isExpired: false }
+  if (days < 30) return { time: `${days}天`, isImminentExpiry: false, isExpired: false }
+  
+  return { time: date.toLocaleDateString('zh-CN'), isImminentExpiry: false, isExpired: false }
+}
+
 // 检查域名规则是否匹配
 function isDomainMatched(targetDomain: string, ruleDomain: string): boolean {
   // 如果规则以 *. 开头，匹配所有子域名（包括主域名）
@@ -129,6 +149,53 @@ function isDomainMatched(targetDomain: string, ruleDomain: string): boolean {
   
   // 精确匹配：只匹配指定的域名，不包括子域名
   return targetDomain === ruleDomain
+}
+
+// 预加载目标链接
+export function preloadTargetUrl(targetUrl: string): void {
+  try {
+    // 如果是直接访问模式，不进行预加载
+    if (window.location.pathname.includes('/direct/')) {
+      return
+    }
+
+    // 创建预加载元素
+    const preloadElements: HTMLElement[] = []
+
+    // DNS 预解析
+    const dnsPreconnect = document.createElement('link')
+    dnsPreconnect.rel = 'dns-prefetch'
+    dnsPreconnect.href = new URL(targetUrl).origin
+    document.head.appendChild(dnsPreconnect)
+    preloadElements.push(dnsPreconnect)
+
+    // 预连接（包含 DNS 解析、TCP 握手、TLS 协商）
+    const preconnect = document.createElement('link')
+    preconnect.rel = 'preconnect'
+    preconnect.href = new URL(targetUrl).origin
+    document.head.appendChild(preconnect)
+    preloadElements.push(preconnect)
+
+    // 预获取页面资源
+    const prefetch = document.createElement('link')
+    prefetch.rel = 'prefetch'
+    prefetch.href = targetUrl
+    document.head.appendChild(prefetch)
+    preloadElements.push(prefetch)
+
+    // 5秒后清理预加载元素，避免内存泄漏
+    setTimeout(() => {
+      preloadElements.forEach(element => {
+        if (element.parentNode) {
+          element.parentNode.removeChild(element)
+        }
+      })
+    }, 5000)
+
+    console.log('预加载已启动:', targetUrl)
+  } catch (error) {
+    console.warn('预加载失败:', error)
+  }
 }
 
 // 检查域名是否被允许访问（服务端使用）

@@ -2,12 +2,17 @@ import { redirect, notFound } from 'next/navigation'
 import { prisma } from '@/lib/db'
 import SafeRedirectClient from './SafeRedirectClient'
 
+
+
 interface PageProps {
   params: Promise<{ path: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
-export default async function ShortLinkPage({ params }: PageProps) {
+export default async function ShortLinkPage({ params, searchParams }: PageProps) {
   const { path } = await params
+  const urlParams = await searchParams
+  const pwd = typeof urlParams.pwd === 'string' ? urlParams.pwd : undefined
 
   try {
     // 查找短链
@@ -19,16 +24,9 @@ export default async function ShortLinkPage({ params }: PageProps) {
       notFound()
     }
 
-    // 检查是否过期
+    // 检查是否过期 - 过期的短链返回404
     if (shortLink.expiresAt && shortLink.expiresAt < new Date()) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-[--color-bg-surface]">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-slate-800 mb-2">链接已过期</h1>
-            <p className="text-slate-500">此短链已过期，无法访问。</p>
-          </div>
-        </div>
-      )
+      notFound()
     }
 
     // 直接跳转的条件：没有密码、不需要确认、且禁用了中间页
@@ -61,6 +59,8 @@ export default async function ShortLinkPage({ params }: PageProps) {
         hasPassword={!!shortLink.password}
         requireConfirm={shortLink.requireConfirm}
         enableIntermediate={shortLink.enableIntermediate}
+        autoFillPassword={pwd}
+        expiresAt={shortLink.expiresAt?.toISOString()}
       />
     )
 

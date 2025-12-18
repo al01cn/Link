@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Settings, Shield, Clock, X, Check, Plus, Trash2 } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Settings, Shield, Clock, X, Check, Plus, Trash2, Zap } from 'lucide-react'
 import { TranslationKey } from '@/lib/translations'
 import { useConfirmDialog, useNotificationDialog } from '@/lib/useDialog'
 import ConfirmDialog from './ConfirmDialog'
@@ -11,6 +11,8 @@ interface SettingsData {
   mode: 'whitelist' | 'blacklist'
   waitTime: number
   captchaEnabled: boolean
+  preloadEnabled: boolean
+  autoFillPasswordEnabled: boolean
 }
 
 interface DomainRule {
@@ -22,13 +24,15 @@ interface DomainRule {
 }
 
 interface SettingsViewProps {
+  isOpen: boolean
   onClose: () => void
   settings: SettingsData
   setSettings: (settings: SettingsData) => void
   t: (key: TranslationKey, params?: Record<string, string | number>) => string
 }
 
-export default function SettingsView({ onClose, settings, setSettings, t }: SettingsViewProps) {
+export default function SettingsView({ isOpen, onClose, settings, setSettings, t }: SettingsViewProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
   const [newDomain, setNewDomain] = useState('')
   const [domainRules, setDomainRules] = useState<DomainRule[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -36,6 +40,7 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
   const [isClient, setIsClient] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null)
+  const [isDarkMode, setIsDarkMode] = useState(false)
   
   // 对话框 hooks
   const confirmDialog = useConfirmDialog()
@@ -46,6 +51,46 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
     setIsClient(true)
   }, [])
 
+  // 初始化主题状态
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      setIsDarkMode(document.documentElement.classList.contains('dark'))
+    }
+  }, [])
+
+  // 控制dialog的打开和关闭
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+
+    if (isOpen) {
+      dialog.showModal()
+      setIsDarkMode(document.documentElement.classList.contains('dark'))
+    } else {
+      dialog.close()
+    }
+  }, [isOpen])
+
+  // 监听主题变化
+  useEffect(() => {
+    if (!isOpen) return
+
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+          setIsDarkMode(document.documentElement.classList.contains('dark'))
+        }
+      })
+    })
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    })
+
+    return () => observer.disconnect()
+  }, [isOpen])
+
   // 加载设置和域名规则
   useEffect(() => {
     loadSettings()
@@ -53,15 +98,32 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
 
   const loadSettings = async () => {
     try {
-      const response = await fetch('/api/settings')
+      const token = typeof window !== 'undefined' ? sessionStorage.getItem('adminToken') : null
+      if (!token) {
+        console.error('未找到管理员token')
+        return
+      }
+
+      const response = await fetch('/api/settings', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
       if (response.ok) {
         const data = await response.json()
         setSettings({
           mode: data.securityMode,
           waitTime: data.waitTime,
-          captchaEnabled: data.captchaEnabled || false
+          captchaEnabled: data.captchaEnabled || false,
+          preloadEnabled: data.preloadEnabled !== false, // 默认启用
+          autoFillPasswordEnabled: data.autoFillPasswordEnabled !== false // 默认启用
         })
         setDomainRules(data.domainRules)
+      } else if (response.status === 401) {
+        notificationDialog.notify({
+          type: 'error',
+          message: '管理员权限已过期，请重新登录'
+        })
       }
     } catch (error) {
       console.error('加载设置失败:', error)
@@ -84,24 +146,43 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
     const timeout = setTimeout(async () => {
       setIsSaving(true)
       try {
+        const token = typeof window !== 'undefined' ? sessionStorage.getItem('adminToken') : null
+        if (!token) {
+          notificationDialog.notify({
+            type: 'error',
+            message: '未找到管理员权限，请重新登录'
+          })
+          return
+        }
+
         const response = await fetch('/api/settings', {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
             securityMode: newSettings.mode,
             waitTime: newSettings.waitTime,
-            captchaEnabled: newSettings.captchaEnabled
+            captchaEnabled: newSettings.captchaEnabled,
+            preloadEnabled: newSettings.preloadEnabled,
+            autoFillPasswordEnabled: newSettings.autoFillPasswordEnabled
           })
         })
         
         if (!response.ok) {
           // 如果保存失败，显示错误提示
-          notificationDialog.notify({
-            type: 'error',
-            message: '保存设置失败，请重试'
-          })
+          if (response.status === 401) {
+            notificationDialog.notify({
+              type: 'error',
+              message: '管理员权限已过期，请重新登录'
+            })
+          } else {
+            notificationDialog.notify({
+              type: 'error',
+              message: '保存设置失败，请重试'
+            })
+          }
         }
       } catch (error) {
         console.error('保存设置失败:', error)
@@ -130,12 +211,22 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
   const addDomain = async () => {
     if (!newDomain.trim()) return
     
+    const token = typeof window !== 'undefined' ? sessionStorage.getItem('adminToken') : null
+    if (!token) {
+      notificationDialog.notify({
+        type: 'error',
+        message: '未找到管理员权限，请重新登录'
+      })
+      return
+    }
+    
     setIsAddingDomain(true)
     try {
       const response = await fetch('/api/domains', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           domain: newDomain.trim(),
@@ -149,10 +240,17 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
         setNewDomain('')
       } else {
         const error = await response.json()
-        notificationDialog.notify({
-          type: 'error',
-          message: error.error || t('addDomainFailed')
-        })
+        if (response.status === 401) {
+          notificationDialog.notify({
+            type: 'error',
+            message: '管理员权限已过期，请重新登录'
+          })
+        } else {
+          notificationDialog.notify({
+            type: 'error',
+            message: error.error || t('addDomainFailed')
+          })
+        }
       }
     } catch (error) {
       console.error('添加域名失败:', error)
@@ -177,11 +275,21 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
     
     if (!confirmed) return
 
+    const token = typeof window !== 'undefined' ? sessionStorage.getItem('adminToken') : null
+    if (!token) {
+      notificationDialog.notify({
+        type: 'error',
+        message: '未找到管理员权限，请重新登录'
+      })
+      return
+    }
+
     try {
       const response = await fetch(`/api/domains/${id}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         }
       })
       
@@ -200,6 +308,9 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
         switch (response.status) {
           case 400:
             errorMessage = `${t('requestError')}: ${errorData.error || t('invalidRequestParams')}`
+            break
+          case 401:
+            errorMessage = '管理员权限已过期，请重新登录'
             break
           case 404:
             errorMessage = `${t('domainRuleNotExists')}: ${errorData.error || t('recordNotFound')}`
@@ -232,11 +343,16 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
   const currentDomains = (domainRules || []).filter(rule => rule.type === settings.mode)
 
   return (
-    <div className={`max-w-2xl mx-auto mt-10 pb-20 ${isClient ? 'animate__animated animate__fadeInUp' : ''}`}>
+    <dialog 
+      ref={dialogRef}
+      className="backdrop:bg-black/50 backdrop:backdrop-blur-sm bg-transparent p-0 max-w-4xl w-full max-h-[90vh] overflow-y-auto rounded-2xl"
+      onClose={onClose}
+    >
+      <div className={`max-w-2xl mx-auto mt-10 pb-20 ${isClient ? 'animate__animated animate__fadeInUp' : ''}`}>
       <div className="cute-card p-8">
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-bold flex items-center gap-2">
+            <h2 className={`text-2xl font-bold flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
               <Settings className="text-[var(--color-primary)]" />
               {t('systemSettings')}
             </h2>
@@ -247,7 +363,7 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
               </div>
             )}
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-400">
+          <button onClick={onClose} className={`p-2 rounded-full transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-400'}`}>
             <X size={24} />
           </button>
         </div>
@@ -256,7 +372,7 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
           
           {/* 安全模式选择 */}
           <div className={isClient ? 'animate__animated animate__fadeIn' : ''}>
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <h3 className={`text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
               <Shield size={16} />
               {t('securityMode')}
             </h3>
@@ -276,7 +392,7 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
                   }`}>
                     {settings.mode === 'whitelist' && <Check size={12} className="text-white" />}
                   </div>
-                  <span className="font-bold text-slate-700">{t('whitelist')}</span>
+                  <span className="font-bold text-slate-700 dark:text-slate-200">{t('whitelist')}</span>
                 </div>
                 <p className="text-xs text-slate-500 pl-8">{t('whitelistDesc')}</p>
               </div>
@@ -296,7 +412,7 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
                   }`}>
                     {settings.mode === 'blacklist' && <Check size={12} className="text-white" />}
                   </div>
-                  <span className="font-bold text-slate-700">{t('blacklist')}</span>
+                  <span className="font-bold text-slate-700 dark:text-slate-200">{t('blacklist')}</span>
                 </div>
                 <p className="text-xs text-slate-500 pl-8">{t('blacklistDesc')}</p>
               </div>
@@ -305,7 +421,7 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
 
           {/* 跳转等待时间 */}
           <div className={isClient ? 'animate__animated animate__fadeIn' : ''}>
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <h3 className={`text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
               <Clock size={16} />
               {t('redirectWait')}
             </h3>
@@ -323,14 +439,14 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
                     saveSettings(newSettings)
                   }}
                 />
-                <span className="text-slate-400 text-sm font-medium">{t('seconds')}</span>
+                <span className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{t('seconds')}</span>
               </div>
             </div>
           </div>
 
           {/* 人机验证设置 */}
           <div className={isClient ? 'animate__animated animate__fadeIn' : ''}>
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <h3 className={`text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
               <Shield size={16} />
               {t('captchaSettings')}
             </h3>
@@ -350,7 +466,7 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
                   }`}>
                     {settings.captchaEnabled && <Check size={12} className="text-white" />}
                   </div>
-                  <span className="font-bold text-slate-700">{t('enableCaptcha')}</span>
+                  <span className="font-bold text-slate-700 dark:text-slate-200">{t('enableCaptcha')}</span>
                 </div>
                 <p className="text-xs text-slate-500 pl-8">{t('captchaDesc')}</p>
               </div>
@@ -370,16 +486,114 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
                   }`}>
                     {!settings.captchaEnabled && <Check size={12} className="text-white" />}
                   </div>
-                  <span className="font-bold text-slate-700">{t('disableCaptcha')}</span>
+                  <span className="font-bold text-slate-700 dark:text-slate-200">{t('disableCaptcha')}</span>
                 </div>
                 <p className="text-xs text-slate-500 pl-8">{t('captchaOffDesc')}</p>
               </div>
             </div>
           </div>
 
+          {/* 预加载设置 */}
+          <div className={isClient ? 'animate__animated animate__fadeIn' : ''}>
+            <h3 className={`text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+              <Zap size={16} />
+              {t('preloadSettings')}
+            </h3>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div 
+                className={`option-card p-4 rounded-xl cursor-pointer bg-slate-50 relative ${
+                  settings.preloadEnabled ? 'active ring-2 ring-[var(--color-primary)]' : 'hover:bg-slate-100'
+                }`}
+                onClick={() => {
+                  const newSettings = {...settings, preloadEnabled: true}
+                  saveSettings(newSettings)
+                }}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                    settings.preloadEnabled ? 'border-[var(--color-primary)] bg-[var(--color-primary)]' : 'border-slate-300'
+                  }`}>
+                    {settings.preloadEnabled && <Check size={12} className="text-white" />}
+                  </div>
+                  <span className="font-bold text-slate-700 dark:text-slate-200">{t('enablePreload')}</span>
+                </div>
+                <p className="text-xs text-slate-500 pl-8">{t('preloadDesc')}</p>
+              </div>
+
+              <div 
+                className={`option-card p-4 rounded-xl cursor-pointer bg-slate-50 relative ${
+                  !settings.preloadEnabled ? 'active ring-2 ring-[var(--color-primary)]' : 'hover:bg-slate-100'
+                }`}
+                onClick={() => {
+                  const newSettings = {...settings, preloadEnabled: false}
+                  saveSettings(newSettings)
+                }}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                    !settings.preloadEnabled ? 'border-[var(--color-primary)] bg-[var(--color-primary)]' : 'border-slate-300'
+                  }`}>
+                    {!settings.preloadEnabled && <Check size={12} className="text-white" />}
+                  </div>
+                  <span className="font-bold text-slate-700 dark:text-slate-200">{t('disablePreload')}</span>
+                </div>
+                <p className="text-xs text-slate-500 pl-8">{t('preloadOffDesc')}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* 密码自动填充设置 */}
+          <div className={isClient ? 'animate__animated animate__fadeIn' : ''}>
+            <h3 className={`text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+              <Shield size={16} />
+              {t('autoFillPasswordSettings')}
+            </h3>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div 
+                className={`option-card p-4 rounded-xl cursor-pointer bg-slate-50 relative ${
+                  settings.autoFillPasswordEnabled ? 'active ring-2 ring-[var(--color-primary)]' : 'hover:bg-slate-100'
+                }`}
+                onClick={() => {
+                  const newSettings = {...settings, autoFillPasswordEnabled: true}
+                  saveSettings(newSettings)
+                }}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                    settings.autoFillPasswordEnabled ? 'border-[var(--color-primary)] bg-[var(--color-primary)]' : 'border-slate-300'
+                  }`}>
+                    {settings.autoFillPasswordEnabled && <Check size={12} className="text-white" />}
+                  </div>
+                  <span className="font-bold text-slate-700 dark:text-slate-200">{t('enableAutoFillPassword')}</span>
+                </div>
+                <p className="text-xs text-slate-500 pl-8">{t('autoFillPasswordDesc')}</p>
+              </div>
+
+              <div 
+                className={`option-card p-4 rounded-xl cursor-pointer bg-slate-50 relative ${
+                  !settings.autoFillPasswordEnabled ? 'active ring-2 ring-[var(--color-primary)]' : 'hover:bg-slate-100'
+                }`}
+                onClick={() => {
+                  const newSettings = {...settings, autoFillPasswordEnabled: false}
+                  saveSettings(newSettings)
+                }}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                    !settings.autoFillPasswordEnabled ? 'border-[var(--color-primary)] bg-[var(--color-primary)]' : 'border-slate-300'
+                  }`}>
+                    {!settings.autoFillPasswordEnabled && <Check size={12} className="text-white" />}
+                  </div>
+                  <span className="font-bold text-slate-700 dark:text-slate-200">{t('disableAutoFillPassword')}</span>
+                </div>
+                <p className="text-xs text-slate-500 pl-8">{t('autoFillPasswordOffDesc')}</p>
+              </div>
+            </div>
+          </div>
+
           {/* 域名列表 */}
           <div className={isClient ? 'animate__animated animate__fadeIn' : ''}>
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">
+            <h3 className={`text-sm font-bold uppercase tracking-wider mb-3 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
               {settings.mode === 'whitelist' ? t('whitelistDomains') : t('blacklistDomains')}
             </h3>
             
@@ -400,7 +614,7 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
                   <input 
                     type="text" 
                     placeholder="例如：*.example.com 或 example.com"
-                    className="w-full outline-none text-slate-700"
+                    className="w-full outline-none text-slate-700 dark:text-slate-200"
                     value={newDomain}
                     onChange={(e) => setNewDomain(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && !isAddingDomain && addDomain()}
@@ -431,8 +645,8 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
               settings.mode === 'whitelist' ? 'bg-slate-50 border-slate-100' : 'bg-red-50 border-red-100'
             }`}>
               {isLoading ? (
-                <div className="text-center py-4 text-slate-400">
-                  <div className="w-6 h-6 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin mx-auto mb-2" />
+                <div className={`text-center py-4 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <div className={`w-6 h-6 border-2 rounded-full animate-spin mx-auto mb-2 ${isDarkMode ? 'border-slate-600 border-t-slate-300' : 'border-slate-300 border-t-slate-600'}`} />
                   {t('loading')}
                 </div>
               ) : currentDomains.length > 0 ? (
@@ -495,27 +709,28 @@ export default function SettingsView({ onClose, settings, setSettings, t }: Sett
         </div>
       </div>
 
-      {/* 确认对话框 */}
-      <ConfirmDialog
-        isOpen={confirmDialog.isOpen}
-        onClose={confirmDialog.onClose}
-        onConfirm={confirmDialog.onConfirm}
-        title={confirmDialog.options.title}
-        message={confirmDialog.options.message}
-        confirmText={confirmDialog.options.confirmText}
-        cancelText={confirmDialog.options.cancelText}
-        type={confirmDialog.options.type}
-      />
+        {/* 确认对话框 */}
+        <ConfirmDialog
+          isOpen={confirmDialog.isOpen}
+          onClose={confirmDialog.onClose}
+          onConfirm={confirmDialog.onConfirm}
+          title={confirmDialog.options.title}
+          message={confirmDialog.options.message}
+          confirmText={confirmDialog.options.confirmText}
+          cancelText={confirmDialog.options.cancelText}
+          type={confirmDialog.options.type}
+        />
 
-      {/* 通知对话框 */}
-      <NotificationDialog
-        isOpen={notificationDialog.isOpen}
-        onClose={notificationDialog.onClose}
-        title={notificationDialog.options.title}
-        message={notificationDialog.options.message}
-        type={notificationDialog.options.type}
-        confirmText={notificationDialog.options.confirmText}
-      />
-    </div>
+        {/* 通知对话框 */}
+        <NotificationDialog
+          isOpen={notificationDialog.isOpen}
+          onClose={notificationDialog.onClose}
+          title={notificationDialog.options.title}
+          message={notificationDialog.options.message}
+          type={notificationDialog.options.type}
+          confirmText={notificationDialog.options.confirmText}
+        />
+      </div>
+    </dialog>
   )
 }

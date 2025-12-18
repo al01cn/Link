@@ -403,7 +403,7 @@ export default function EditLinkDialog({
                     </span>
                   </div>
                 </div>
-                <div className="relative">
+                <div className="relative w-10 h-6">
                   <input 
                     type="checkbox" 
                     className="peer sr-only cute-switch-checkbox" 
@@ -411,11 +411,16 @@ export default function EditLinkDialog({
                     disabled={password.trim() !== '' || isLoading}
                     onChange={() => handleEnableIntermediateChange(!enableIntermediate)} 
                   />
-                  <div className={`w-10 h-6 rounded-full transition-colors ${
-                    password.trim() ? 'bg-slate-300' : 'bg-slate-200 peer-checked:bg-blue-500'
-                  }`}>
-                    <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4 shadow-sm"></div>
-                  </div>
+                  <div className={`w-full h-full rounded-full transition-colors ${
+                    password.trim() 
+                      ? 'bg-slate-300 dark:bg-slate-600' 
+                      : enableIntermediate 
+                        ? 'bg-[var(--color-primary)]' 
+                        : 'bg-slate-200 dark:bg-slate-600'
+                  }`}></div>
+                  <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${
+                    enableIntermediate ? 'translate-x-4' : 'translate-x-0'
+                  }`}></div>
                 </div>
               </label>
 
@@ -434,7 +439,7 @@ export default function EditLinkDialog({
                     </span>
                   </div>
                 </div>
-                <div className="relative">
+                <div className="relative w-10 h-6">
                   <input 
                     type="checkbox" 
                     className="peer sr-only cute-switch-checkbox" 
@@ -442,9 +447,14 @@ export default function EditLinkDialog({
                     disabled={isLoading}
                     onChange={() => handleRequireConfirmChange(!requireConfirm)} 
                   />
-                  <div className="w-10 h-6 bg-slate-200 rounded-full transition-colors peer-checked:bg-blue-500">
-                    <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4 shadow-sm"></div>
-                  </div>
+                  <div className={`w-full h-full rounded-full transition-colors ${
+                    requireConfirm 
+                      ? 'bg-[var(--color-primary)]' 
+                      : 'bg-slate-200 dark:bg-slate-600'
+                  }`}></div>
+                  <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${
+                    requireConfirm ? 'translate-x-4' : 'translate-x-0'
+                  }`}></div>
                 </div>
               </label>
 

@@ -4,10 +4,17 @@ import { generateShortPath, isValidUrl, fetchPageTitle, extractDomain, checkDoma
 import { encryptPassword } from '@/lib/crypto'
 import { logCreate, logError } from '@/lib/logger'
 import { translateForRequest } from '@/lib/translations'
+import { verifyAdminToken } from '@/lib/adminAuth'
 
 // 创建短链
 export async function POST(request: NextRequest) {
   try {
+    // 验证管理员权限
+    const adminPayload = verifyAdminToken(request)
+    if (!adminPayload) {
+      return NextResponse.json({ error: translateForRequest(request, 'apiAdminRequired') }, { status: 401 })
+    }
+
     const body = await request.json()
     const { 
       originalUrl, 
@@ -127,6 +134,7 @@ export async function POST(request: NextRequest) {
       title: shortLink.title,
       views: shortLink.views,
       createdAt: shortLink.createdAt,
+      expiresAt: shortLink.expiresAt,
       hasPassword: !!shortLink.password,
       requireConfirm: shortLink.requireConfirm,
       enableIntermediate: shortLink.enableIntermediate
@@ -142,6 +150,12 @@ export async function POST(request: NextRequest) {
 // 获取短链列表
 export async function GET(request: NextRequest) {
   try {
+    // 验证管理员权限
+    const adminPayload = verifyAdminToken(request)
+    if (!adminPayload) {
+      return NextResponse.json({ error: translateForRequest(request, 'apiAdminRequired') }, { status: 401 })
+    }
+
     const links = await prisma.shortLink.findMany({
       orderBy: { createdAt: 'desc' },
       take: 50
@@ -157,6 +171,7 @@ export async function GET(request: NextRequest) {
       title: link.title,
       views: link.views,
       createdAt: link.createdAt,
+      expiresAt: link.expiresAt,
       hasPassword: !!link.password,
       requireConfirm: link.requireConfirm,
       enableIntermediate: link.enableIntermediate

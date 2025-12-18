@@ -46,16 +46,8 @@ export default function AdminLoginPage() {
       const data = await response.json()
 
       if (response.ok) {
-        login(data.token, data.username)
-        
-        // 如果是默认账户，提示修改密码
-        if (data.isDefault) {
-          notificationDialog.notify({
-            type: 'warning',
-            title: t('warning'),
-            message: t('defaultAccountWarning')
-          })
-        }
+        // 传递默认账号标识给login函数
+        login(data.token, data.username, data.isDefault)
       } else {
         setError(data.error || t('loginFailed'))
       }
@@ -90,7 +82,7 @@ export default function AdminLoginPage() {
             <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <Shield className="text-blue-600" size={32} />
             </div>
-            <h1 className="text-3xl font-bold text-slate-800 mb-2">{t('appTitle')} {t('management')}</h1>
+            <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-200 mb-2">{t('appTitle')} {t('management')}</h1>
             <p className="text-slate-500">{t('pleaseLoginToContinue')}</p>
           </div>
 
@@ -103,7 +95,7 @@ export default function AdminLoginPage() {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 {t('username')}
               </label>
               <div className="relative">
@@ -120,7 +112,7 @@ export default function AdminLoginPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 {t('loginPassword')}
               </label>
               <div className="relative">
@@ -160,11 +152,7 @@ export default function AdminLoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-xs text-slate-400">
-              {t('defaultAccount')}: Loooong / Loooong123
-            </p>
-          </div>
+
         </div>
       </div>
 

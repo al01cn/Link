@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { translateForRequest } from '@/lib/translations'
+import { verifyAdminToken } from '@/lib/adminAuth'
 
 // 获取系统设置
 export async function GET(request: NextRequest) {
   try {
+    // 验证管理员权限
+    const adminPayload = verifyAdminToken(request)
+    if (!adminPayload) {
+      return NextResponse.json({ error: translateForRequest(request, 'apiAdminRequired') }, { status: 401 })
+    }
+
     // 获取安全模式设置
     const securityMode = await prisma.setting.findUnique({
       where: { key: 'security_mode' }
@@ -20,6 +27,16 @@ export async function GET(request: NextRequest) {
       where: { key: 'captcha_enabled' }
     })
     
+    // 获取预加载开关设置
+    const preloadEnabled = await prisma.setting.findUnique({
+      where: { key: 'preload_enabled' }
+    })
+    
+    // 获取密码自动填充开关设置
+    const autoFillPasswordEnabled = await prisma.setting.findUnique({
+      where: { key: 'auto_fill_password_enabled' }
+    })
+    
     // 获取域名规则
     const domainRules = await prisma.domainRule.findMany({
       where: { active: true },
@@ -30,6 +47,8 @@ export async function GET(request: NextRequest) {
       securityMode: securityMode?.value || 'blacklist',
       waitTime: parseInt(waitTime?.value || '3'),
       captchaEnabled: captchaEnabled?.value === 'true',
+      preloadEnabled: preloadEnabled?.value !== 'false', // 默认启用
+      autoFillPasswordEnabled: autoFillPasswordEnabled?.value !== 'false', // 默认启用
       domainRules
     })
   } catch (error) {
@@ -41,8 +60,14 @@ export async function GET(request: NextRequest) {
 // 更新系统设置
 export async function PUT(request: NextRequest) {
   try {
+    // 验证管理员权限
+    const adminPayload = verifyAdminToken(request)
+    if (!adminPayload) {
+      return NextResponse.json({ error: translateForRequest(request, 'apiAdminRequired') }, { status: 401 })
+    }
+
     const body = await request.json()
-    const { securityMode, waitTime, captchaEnabled } = body
+    const { securityMode, waitTime, captchaEnabled, preloadEnabled, autoFillPasswordEnabled } = body
     
     // 更新安全模式
     if (securityMode) {
@@ -68,6 +93,24 @@ export async function PUT(request: NextRequest) {
         where: { key: 'captcha_enabled' },
         update: { value: captchaEnabled.toString() },
         create: { key: 'captcha_enabled', value: captchaEnabled.toString() }
+      })
+    }
+    
+    // 更新预加载开关
+    if (preloadEnabled !== undefined) {
+      await prisma.setting.upsert({
+        where: { key: 'preload_enabled' },
+        update: { value: preloadEnabled.toString() },
+        create: { key: 'preload_enabled', value: preloadEnabled.toString() }
+      })
+    }
+    
+    // 更新密码自动填充开关
+    if (autoFillPasswordEnabled !== undefined) {
+      await prisma.setting.upsert({
+        where: { key: 'auto_fill_password_enabled' },
+        update: { value: autoFillPasswordEnabled.toString() },
+        create: { key: 'auto_fill_password_enabled', value: autoFillPasswordEnabled.toString() }
       })
     }
     

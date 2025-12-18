@@ -2,22 +2,17 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { AlertTriangle, ExternalLink, Clock, ArrowRight, Shield, Zap, AlertCircle } from 'lucide-react'
-import { isValidUrl } from '@/lib/utils'
+import { AlertTriangle, ExternalLink, Clock, ArrowRight, Shield, Zap, AlertCircle, Globe } from 'lucide-react'
+import { preloadTargetUrl } from '@/lib/utils'
 import { useLanguage, LanguageProvider } from '@/lib/LanguageContext'
+import { useTheme, ThemeProvider } from '@/lib/ThemeContext'
 import TurnstileWidget from '@/components/TurnstileWidget'
+import ThemeToggle from '@/components/ThemeToggle'
 
 // 跳转类型枚举
 type RedirectType = 'href' | 'auto' | 'confirm'
 
-// Token 配置接口
-interface TokenConfig {
-  url: string
-  type?: RedirectType
-  title?: string
-  msg?: string
-  turnstile?: boolean
-}
+
 
 // API 响应接口
 interface ToApiResponse {
@@ -30,7 +25,7 @@ interface ToApiResponse {
 }
 
 function ToPageContent() {
-  const { t } = useLanguage()
+  const { t, language, setLanguage } = useLanguage()
   const searchParams = useSearchParams()
   const [targetUrl, setTargetUrl] = useState('')
   const [title, setTitle] = useState('')
@@ -44,6 +39,8 @@ function ToPageContent() {
   const [captchaToken, setCaptchaToken] = useState('')
   const [captchaError, setCaptchaError] = useState('')
   const [captchaVerified, setCaptchaVerified] = useState(false)
+  const [preloadEnabled, setPreloadEnabled] = useState(true)
+
 
   // 客户端水合完成后启用动画
   useEffect(() => {
@@ -82,6 +79,16 @@ function ToPageContent() {
     }
   }, [countdown, targetUrl, error, isLoading, redirectType, captchaEnabled, captchaVerified])
 
+  // 自动跳转模式的预加载逻辑
+  useEffect(() => {
+    if (!preloadEnabled || !targetUrl || error || isLoading) return
+    
+    // 在倒计时开始时进行预加载（人机验证通过后）
+    if (redirectType === 'auto' && countdown === 5 && (!captchaEnabled || captchaVerified)) {
+      preloadTargetUrl(targetUrl)
+    }
+  }, [preloadEnabled, targetUrl, error, isLoading, redirectType, countdown, captchaEnabled, captchaVerified])
+
   const fetchToConfig = async (token?: string | null, url?: string | null, type?: string | null) => {
     try {
       // 构建 API 请求 URL
@@ -107,6 +114,18 @@ function ToPageContent() {
         setMessage(data.msg)
         setRedirectType(data.type)
         setCaptchaEnabled(data.captchaEnabled)
+        
+        // 加载系统设置
+        try {
+          const settingsResponse = await fetch('/api/public-settings')
+          if (settingsResponse.ok) {
+            const settingsData = await settingsResponse.json()
+            setPreloadEnabled(settingsData.preloadEnabled !== false) // 默认启用
+          }
+        } catch (error) {
+          console.error('加载系统设置失败:', error)
+          // 设置失败不影响主要功能，使用默认值
+        }
 
         // href 模式直接跳转
         if (data.type === 'href') {
@@ -136,6 +155,11 @@ function ToPageContent() {
     if (captchaEnabled && !captchaVerified) {
       setCaptchaError(t('captchaRequired'))
       return
+    }
+    
+    // 验证通过后，如果启用预加载且未进行过预加载，则立即开始预加载
+    if (preloadEnabled && targetUrl && !captchaEnabled) {
+      preloadTargetUrl(targetUrl)
     }
     
     setIsLoading(true)
@@ -199,6 +223,10 @@ function ToPageContent() {
     // 如果是自动跳转模式，验证通过后重置倒计时
     if (redirectType === 'auto') {
       setCountdown(5)
+    }
+    // 人机验证通过后，如果启用预加载且是确认模式，则开始预加载
+    if (preloadEnabled && targetUrl && redirectType === 'confirm') {
+      preloadTargetUrl(targetUrl)
     }
   }
 
@@ -271,7 +299,7 @@ function ToPageContent() {
           <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
             <AlertTriangle size={32} />
           </div>
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">{t('accessError')}</h2>
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200 mb-2">{t('accessError')}</h2>
           <p className="text-slate-500 mb-6">{error}</p>
           <button 
             onClick={handleCancel}
@@ -286,6 +314,26 @@ function ToPageContent() {
 
   return (
     <div className="min-h-screen bg-[--color-bg-surface] preview-grid">
+      {/* 顶部控制栏 */}
+      <div className="fixed top-4 right-4 z-50 flex items-center gap-3">
+        {/* 主题切换 */}
+        <ThemeToggle t={t} />
+        
+        {/* 语言切换 */}
+        <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-full p-1 transition-colors">
+          <button
+            onClick={() => setLanguage(language === 'zh' ? 'en' : 'zh')}
+            className="cute-btn w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm relative"
+            title={t('switchLanguage')}
+          >
+            <Globe size={16} />
+            <span className="absolute -bottom-1 -right-1 text-[8px] font-bold bg-slate-200 dark:bg-slate-600 px-1 rounded text-slate-600 dark:text-slate-300 leading-none">
+              {language.toUpperCase()}
+            </span>
+          </button>
+        </div>
+      </div>
+
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className={`cute-card max-w-md w-full p-8 text-center ${isClient ? 'animate-fade-in' : ''}`}>
           <div className={`w-16 h-16 ${getIconAndColor().bgColor} ${getIconAndColor().color} rounded-full flex items-center justify-center mx-auto mb-6`}>
@@ -295,14 +343,14 @@ function ToPageContent() {
             })()}
           </div>
           
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200 mb-2">
             {getDisplayTitle()}
           </h2>
           <p className="text-slate-500 mb-6 text-sm leading-relaxed">
             {message}
           </p>
 
-          <div className="bg-slate-50 rounded-xl p-4 mb-6 text-left border border-slate-100 relative overflow-hidden group">
+          <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-4 mb-6 text-left border border-slate-100 dark:border-slate-600 relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-2 opacity-50 group-hover:opacity-100 transition-opacity">
               <ExternalLink size={16} className="text-slate-400" />
             </div>
@@ -372,17 +420,19 @@ function ToPageContent() {
 
 export default function ToPage() {
   return (
-    <LanguageProvider>
-      <Suspense fallback={
-        <div className="min-h-screen bg-[--color-bg-surface] preview-grid flex items-center justify-center">
-          <div className="cute-card max-w-md w-full p-8 text-center">
-            <div className="w-8 h-8 border-2 border-[--color-primary]/30 border-t-[--color-primary] rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-slate-500">加载中...</p>
+    <ThemeProvider>
+      <LanguageProvider>
+        <Suspense fallback={
+          <div className="min-h-screen bg-[--color-bg-surface] preview-grid flex items-center justify-center">
+            <div className="cute-card max-w-md w-full p-8 text-center">
+              <div className="w-8 h-8 border-2 border-[--color-primary]/30 border-t-[--color-primary] rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-slate-500">加载中...</p>
+            </div>
           </div>
-        </div>
-      }>
-        <ToPageContent />
-      </Suspense>
-    </LanguageProvider>
+        }>
+          <ToPageContent />
+        </Suspense>
+      </LanguageProvider>
+    </ThemeProvider>
   )
 }

@@ -31,6 +31,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: translateForRequest(request, 'newPasswordMinLength') }, { status: 400 })
     }
 
+    // 防止改回默认账号密码
+    if (newUsername === 'Loooong' && newPassword === 'Loooong123') {
+      return NextResponse.json({ error: translateForRequest(request, 'cannotUseDefaultCredentials') }, { status: 400 })
+    }
+
+    // 防止单独使用默认用户名或密码
+    if (newUsername === 'Loooong') {
+      return NextResponse.json({ error: translateForRequest(request, 'cannotUseDefaultUsername') }, { status: 400 })
+    }
+
+    if (newPassword === 'Loooong123') {
+      return NextResponse.json({ error: translateForRequest(request, 'cannotUseDefaultPassword') }, { status: 400 })
+    }
+
     // 查找当前管理员
     const admin = await prisma.admin.findUnique({
       where: { id: decoded.adminId }

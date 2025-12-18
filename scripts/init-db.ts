@@ -40,6 +40,26 @@ async function main() {
     }
   })
 
+  // 创建预加载设置
+  await prisma.setting.upsert({
+    where: { key: 'preload_enabled' },
+    update: {},
+    create: {
+      key: 'preload_enabled',
+      value: 'true'
+    }
+  })
+
+  // 创建密码自动填充设置
+  await prisma.setting.upsert({
+    where: { key: 'auto_fill_password_enabled' },
+    update: {},
+    create: {
+      key: 'auto_fill_password_enabled',
+      value: 'true'  // 默认开启自动填充
+    }
+  })
+
   // 清理现有的域名规则（如果有的话）
   await prisma.domainRule.deleteMany({})
   

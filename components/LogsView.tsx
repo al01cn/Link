@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLanguage } from '@/lib/LanguageContext'
 import { 
   Activity, 
@@ -72,6 +72,7 @@ interface LogsViewProps {
  * @description 显示系统日志，包括访问日志、短链生成日志和错误日志
  */
 export default function LogsView({ isOpen, onClose }: LogsViewProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
   const { t, language } = useLanguage()
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [stats, setStats] = useState<LogStats | null>(null)
@@ -82,10 +83,51 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
   const [currentPage, setCurrentPage] = useState(1)
   const [activeTab, setActiveTab] = useState<'logs' | 'stats'>('logs')
   const [isCleaningLogs, setIsCleaningLogs] = useState(false)
+  const [isDarkMode, setIsDarkMode] = useState(false)
   
   // 对话框 hooks
   const confirmDialog = useConfirmDialog()
   const notificationDialog = useNotificationDialog()
+
+  // 初始化主题状态
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      setIsDarkMode(document.documentElement.classList.contains('dark'))
+    }
+  }, [])
+
+  // 控制dialog的打开和关闭
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+
+    if (isOpen) {
+      dialog.showModal()
+      setIsDarkMode(document.documentElement.classList.contains('dark'))
+    } else {
+      dialog.close()
+    }
+  }, [isOpen])
+
+  // 监听主题变化
+  useEffect(() => {
+    if (!isOpen) return
+
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+          setIsDarkMode(document.documentElement.classList.contains('dark'))
+        }
+      })
+    })
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    })
+
+    return () => observer.disconnect()
+  }, [isOpen])
 
   // 加载日志数据
   const fetchLogs = async () => {
@@ -240,38 +282,40 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
     return true
   })
 
-  if (!isOpen) return null
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col">
+    <dialog 
+      ref={dialogRef}
+      className="backdrop:bg-black/50 backdrop:backdrop-blur-sm bg-transparent rounded-lg w-full max-w-6xl h-[90vh] p-0"
+      onClose={onClose}
+    >
+      <div className={`rounded-lg shadow-xl w-full h-full flex flex-col border ${isDarkMode ? 'bg-slate-800 text-slate-200 border-slate-600' : 'bg-white text-gray-900 border-gray-200'}`}>
         {/* 头部 */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className={`flex items-center justify-between p-6 border-b ${isDarkMode ? 'border-slate-600' : 'border-gray-200'}`}>
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center text-white">
               <Activity size={18} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">{t('systemLogsTitle')}</h2>
-              <p className="text-sm text-gray-600">{t('systemLogsDesc')}</p>
+              <h2 className={`text-xl font-bold ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('systemLogsTitle')}</h2>
+              <p className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>{t('systemLogsDesc')}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className={`p-2 rounded-lg transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-gray-100 text-gray-600'}`}
           >
             <X size={20} />
           </button>
         </div>
 
         {/* 标签页 */}
-        <div className="flex border-b border-gray-200">
+        <div className="flex border-b border-gray-200 dark:border-slate-600">
           <button
             onClick={() => setActiveTab('logs')}
             className={`px-6 py-3 font-medium text-sm border-b-2 transition-colors ${
               activeTab === 'logs'
-                ? 'border-purple-500 text-purple-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
+                ? 'border-purple-500 text-purple-600 dark:text-purple-400'
+                : 'border-transparent text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
             }`}
           >
             {t('logRecords')}
@@ -280,8 +324,8 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
             onClick={() => setActiveTab('stats')}
             className={`px-6 py-3 font-medium text-sm border-b-2 transition-colors ${
               activeTab === 'stats'
-                ? 'border-purple-500 text-purple-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
+                ? 'border-purple-500 text-purple-600 dark:text-purple-400'
+                : 'border-transparent text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
             }`}
           >
             {t('statisticsAnalysis')}
@@ -293,22 +337,30 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
           {activeTab === 'logs' ? (
             <div className="h-full flex flex-col">
               {/* 筛选和搜索 */}
-              <div className="p-4 border-b border-gray-200">
+              <div className={`p-4 border-b ${isDarkMode ? 'border-slate-600' : 'border-gray-200'}`}>
                 <div className="flex flex-col md:flex-row gap-3">
                   {/* 搜索框 */}
                   <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                    <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`} size={18} />
                     <input
                       type="text"
                       placeholder={t('searchLogsPlaceholder')}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                        isDarkMode 
+                          ? 'border-slate-600 bg-slate-800 text-slate-200' 
+                          : 'border-gray-300 bg-white text-gray-900'
+                      }`}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
                     {searchQuery && (
                       <button
                         onClick={() => setSearchQuery('')}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        className={`absolute right-3 top-1/2 transform -translate-y-1/2 ${
+                          isDarkMode 
+                            ? 'text-slate-500 hover:text-slate-300' 
+                            : 'text-gray-400 hover:text-gray-600'
+                        }`}
                       >
                         <X size={16} />
                       </button>
@@ -321,8 +373,8 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                       onClick={() => setFilterType('all')}
                       className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                         filterType === 'all'
-                          ? 'bg-purple-100 text-purple-700 border border-purple-200'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          ? `${isDarkMode ? 'bg-purple-900/50 text-purple-300 border border-purple-700' : 'bg-purple-100 text-purple-700 border border-purple-200'}`
+                          : `${isDarkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`
                       }`}
                     >
                       {t('allLogs')}
@@ -331,8 +383,8 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                       onClick={() => setFilterType('visit')}
                       className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
                         filterType === 'visit'
-                          ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          ? `${isDarkMode ? 'bg-blue-900/50 text-blue-300 border border-blue-700' : 'bg-blue-100 text-blue-700 border border-blue-200'}`
+                          : `${isDarkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`
                       }`}
                     >
                       <Eye size={14} />
@@ -342,8 +394,8 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                       onClick={() => setFilterType('create')}
                       className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
                         filterType === 'create'
-                          ? 'bg-green-100 text-green-700 border border-green-200'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          ? `${isDarkMode ? 'bg-green-900/50 text-green-300 border border-green-700' : 'bg-green-100 text-green-700 border border-green-200'}`
+                          : `${isDarkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`
                       }`}
                     >
                       <Plus size={14} />
@@ -353,8 +405,8 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
                       onClick={() => setFilterType('error')}
                       className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
                         filterType === 'error'
-                          ? 'bg-red-100 text-red-700 border border-red-200'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          ? `${isDarkMode ? 'bg-red-900/50 text-red-300 border border-red-700' : 'bg-red-100 text-red-700 border border-red-200'}`
+                          : `${isDarkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`
                       }`}
                     >
                       <AlertTriangle size={14} />
@@ -646,6 +698,6 @@ export default function LogsView({ isOpen, onClose }: LogsViewProps) {
         type={notificationDialog.options.type}
         confirmText={notificationDialog.options.confirmText}
       />
-    </div>
+    </dialog>
   )
 }

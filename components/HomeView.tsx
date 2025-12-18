@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link2, ArrowRight, Settings, ChevronDown, Lock, Shield, Zap, Eye, Copy, Trash2, X, Search, Filter, Calendar, SortAsc, SortDesc, MousePointer, ExternalLink, Edit, Check } from 'lucide-react'
-import { formatTimeAgo } from '@/lib/utils'
+import { formatTimeAgo, formatTimeRemaining } from '@/lib/utils'
 import { TranslationKey } from '@/lib/translations'
 import { useConfirmDialog, useNotificationDialog } from '@/lib/useDialog'
 import { requestCache } from '@/lib/requestCache'
@@ -19,6 +19,7 @@ interface ShortLink {
   title?: string
   views: number
   createdAt: string
+  expiresAt?: string // 添加过期时间字段
   hasPassword: boolean
   requireConfirm: boolean
   enableIntermediate: boolean
@@ -39,7 +40,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
   
   // 搜索和筛选状态
   const [searchQuery, setSearchQuery] = useState('')
-  const [filterType, setFilterType] = useState<'all' | 'password' | 'confirm' | 'auto' | 'direct'>('all')
+  const [filterType, setFilterType] = useState<'all' | 'password' | 'confirm' | 'auto' | 'direct' | 'expired' | 'active'>('all')
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'views' | 'title'>('newest')
   const [showFilters, setShowFilters] = useState(false)
   
@@ -64,6 +65,9 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
   // 编辑展开状态
   const [expandedEditId, setExpandedEditId] = useState<string | null>(null)
   
+  // 主题状态
+  const [isDarkMode, setIsDarkMode] = useState(false)
+  
   // 检查管理员登录状态
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -71,6 +75,31 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
       setIsAdminLoggedIn(!!token)
     }
   }, [showAdminModal])
+
+  // 初始化主题状态
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      setIsDarkMode(document.documentElement.classList.contains('dark'))
+    }
+  }, [])
+
+  // 监听主题变化
+  useEffect(() => {
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+          setIsDarkMode(document.documentElement.classList.contains('dark'))
+        }
+      })
+    })
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    })
+
+    return () => observer.disconnect()
+  }, [])
 
   // 管理员弹窗效果
   useEffect(() => {
@@ -82,6 +111,13 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
           dialogPolyfill.default.registerDialog(dialog)
         }
         dialog.showModal()
+        // 确保弹窗继承暗色模式
+        const isDark = document.documentElement.classList.contains('dark')
+        if (isDark) {
+          dialog.classList.add('dark')
+        } else {
+          dialog.classList.remove('dark')
+        }
       } else if (!showAdminModal && dialog && dialog.open) {
         dialog.close()
       }
@@ -99,6 +135,13 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
           dialogPolyfill.default.registerDialog(dialog)
         }
         dialog.showModal()
+        // 确保弹窗继承暗色模式
+        const isDark = document.documentElement.classList.contains('dark')
+        if (isDark) {
+          dialog.classList.add('dark')
+        } else {
+          dialog.classList.remove('dark')
+        }
       } else if (!showPasswordModal && dialog && dialog.open) {
         dialog.close()
       }
@@ -155,8 +198,18 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
     
     const loadLinks = async () => {
       try {
+        const token = typeof window !== 'undefined' ? sessionStorage.getItem('adminToken') : null
+        if (!token) {
+          console.error('未找到管理员token')
+          return
+        }
+
         const data = await requestCache.get('links', async () => {
-          const response = await fetch('/api/links')
+          const response = await fetch('/api/links', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
           if (response.ok) {
             return response.json()
           }
@@ -180,12 +233,27 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
 
   const fetchLinks = async () => {
     try {
+      const token = typeof window !== 'undefined' ? sessionStorage.getItem('adminToken') : null
+      if (!token) {
+        console.error('未找到管理员token')
+        return
+      }
+
       // 刷新时清除缓存，确保获取最新数据
       requestCache.clear()
-      const response = await fetch('/api/links')
+      const response = await fetch('/api/links', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
       if (response.ok) {
         const data = await response.json()
         setLinks(data)
+      } else if (response.status === 401) {
+        notificationDialog.notify({
+          type: 'error',
+          message: '管理员权限已过期，请重新登录'
+        })
       }
     } catch (error) {
       console.error('获取短链列表失败:', error)
@@ -244,10 +312,20 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
     setIsGenerating(true)
     
     try {
+      const token = typeof window !== 'undefined' ? sessionStorage.getItem('adminToken') : null
+      if (!token) {
+        notificationDialog.notify({
+          type: 'error',
+          message: '未找到管理员权限，请重新登录'
+        })
+        return
+      }
+
       const response = await fetch('/api/links', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           originalUrl: url,
@@ -289,10 +367,17 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
             copyToClipboard(error.existingLink.shortUrl, error.existingLink.id)
           }
         } else {
-          notificationDialog.notify({
-            type: 'error',
-            message: error.error || t('generateFailed')
-          })
+          if (response.status === 401) {
+            notificationDialog.notify({
+              type: 'error',
+              message: '管理员权限已过期，请重新登录'
+            })
+          } else {
+            notificationDialog.notify({
+              type: 'error',
+              message: error.error || t('generateFailed')
+            })
+          }
         }
       }
     } catch (error) {
@@ -332,17 +417,36 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
     if (!linkExists) return
     
     try {
+      const token = typeof window !== 'undefined' ? sessionStorage.getItem('adminToken') : null
+      if (!token) {
+        notificationDialog.notify({
+          type: 'error',
+          message: '未找到管理员权限，请重新登录'
+        })
+        return
+      }
+
       const response = await fetch(`/api/links/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       })
       
       if (response.ok) {
         setLinks(links.filter(link => link.id !== id))
       } else {
-        notificationDialog.notify({
-          type: 'error',
-          message: t('deleteFailed')
-        })
+        if (response.status === 401) {
+          notificationDialog.notify({
+            type: 'error',
+            message: '管理员权限已过期，请重新登录'
+          })
+        } else {
+          notificationDialog.notify({
+            type: 'error',
+            message: t('deleteFailed')
+          })
+        }
       }
     } catch (error) {
       console.error('删除失败:', error)
@@ -435,10 +539,20 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
   // 处理编辑保存
   const handleEditSave = async (linkId: string, updateData: any) => {
     try {
+      const token = typeof window !== 'undefined' ? sessionStorage.getItem('adminToken') : null
+      if (!token) {
+        notificationDialog.notify({
+          type: 'error',
+          message: '未找到管理员权限，请重新登录'
+        })
+        return
+      }
+
       const response = await fetch(`/api/links/${linkId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(updateData)
       })
@@ -455,10 +569,17 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
         })
       } else {
         const error = await response.json()
-        notificationDialog.notify({
-          type: 'error',
-          message: error.error || t('updateFailed')
-        })
+        if (response.status === 401) {
+          notificationDialog.notify({
+            type: 'error',
+            message: '管理员权限已过期，请重新登录'
+          })
+        } else {
+          notificationDialog.notify({
+            type: 'error',
+            message: error.error || t('updateFailed')
+          })
+        }
       }
     } catch (error) {
       console.error('更新短链失败:', error)
@@ -467,6 +588,12 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
         message: t('networkErrorRetry')
       })
     }
+  }
+
+  // 检查链接是否过期
+  const isLinkExpired = (link: ShortLink) => {
+    if (!link.expiresAt) return false
+    return new Date(link.expiresAt) <= new Date()
   }
 
   // 筛选和排序逻辑
@@ -496,6 +623,10 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
             return !link.hasPassword && !link.requireConfirm && link.enableIntermediate
           case 'direct':
             return !link.hasPassword && !link.requireConfirm && !link.enableIntermediate
+          case 'expired':
+            return isLinkExpired(link)
+          case 'active':
+            return !isLinkExpired(link)
           default:
             return true
         }
@@ -535,23 +666,23 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
       
       {/* 标题区域 */}
       <div className={`text-center mt-12 mb-10 ${isClient ? 'animate__animated animate__fadeInDown' : ''}`}>
-        <h1 className="text-4xl md:text-5xl font-extrabold text-slate-800 mb-4 tracking-tight">
+        <h1 className="text-4xl md:text-5xl font-extrabold text-slate-800 dark:text-slate-200 mb-4 tracking-tight">
           {t('heroTitle')}<span className="text-[var(--color-primary)]">{t('heroTitleHighlight')}</span> Links
         </h1>
-        <p className="text-slate-500 text-lg">{t('heroDesc')}</p>
+        <p className="text-slate-500 dark:text-slate-400 text-lg">{t('heroDesc')}</p>
       </div>
 
       {/* 输入区域 */}
-      <div className={`cute-card p-2 md:p-3 mb-8 shadow-xl shadow-blue-100/50 relative z-10 ${isClient ? 'animate__animated animate__fadeInUp' : ''}`}>
+      <div className={`cute-card p-2 md:p-3 mb-8 relative z-10 ${isClient ? 'animate__animated animate__fadeInUp' : ''}`}>
         <div className="flex flex-col md:flex-row gap-2">
-          <div className={`cute-input-wrapper flex-1 bg-slate-50 rounded-xl px-4 py-3 flex items-center gap-3 ${
-            formErrors.url ? 'border-2 border-red-300' : ''
+          <div className={`cute-input-wrapper flex-1 bg-slate-50 dark:bg-slate-800 rounded-xl px-4 py-3 flex items-center gap-3 ${
+            formErrors.url ? 'border-2 border-red-300 dark:border-red-400' : ''
           }`}>
-            <Link2 className="text-slate-400" />
+            <Link2 className="text-slate-400 dark:text-slate-500" />
             <input 
               type="text" 
               placeholder={t('inputPlaceholder')}
-              className="flex-1 bg-transparent border-none outline-none text-lg text-slate-800 placeholder-slate-400"
+              className="flex-1 bg-transparent border-none outline-none text-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500"
               value={url}
               onChange={(e) => {
                 setUrl(e.target.value)
@@ -568,7 +699,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
           <button 
             onClick={generateLink}
             disabled={isGenerating || !url}
-            className={`cute-btn shine-effect bg-[var(--color-primary)] text-white px-8 py-3 rounded-xl font-bold text-lg shadow-lg shadow-blue-200 hover:bg-[var(--color-primary-hover)] flex items-center justify-center gap-2 min-w-[140px] ${
+            className={`cute-btn shine-effect bg-[var(--color-primary)] text-white px-8 py-3 rounded-xl font-bold text-lg shadow-lg shadow-blue-200 dark:shadow-slate-900/50 hover:bg-[var(--color-primary-hover)] flex items-center justify-center gap-2 min-w-[140px] ${
               isGenerating || !url ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           >
@@ -584,7 +715,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
         <div className="mt-2 px-2">
           <button 
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="text-xs font-semibold text-slate-500 hover:text-[var(--color-primary)] flex items-center gap-1 py-2 transition-colors"
+            className="text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-[var(--color-primary)] flex items-center gap-1 py-2 transition-colors"
           >
             <Settings size={14} />
             {showAdvanced ? t('collapseOptions') : t('advancedOptions')}
@@ -593,7 +724,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
 
           {/* 可折叠面板 */}
           <div className={`grid gap-4 overflow-hidden transition-all duration-300 ease-out ${
-            showAdvanced ? 'grid-rows-[1fr] opacity-100 pt-4 pb-2 border-t border-slate-100 mt-2' : 'grid-rows-[0fr] opacity-0 h-0'
+            showAdvanced ? 'grid-rows-[1fr] opacity-100 pt-4 pb-2 border-t border-slate-100 dark:border-slate-700 mt-2' : 'grid-rows-[0fr] opacity-0 h-0'
           }`}>
             <div className="min-h-0 space-y-4">
               
@@ -601,15 +732,15 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
               <div className="grid md:grid-cols-2 gap-4">
                 {/* 自定义地址 */}
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1 ml-1">{t('customAddress')}</label>
-                  <div className={`cute-input-wrapper bg-white rounded-lg px-3 py-2 flex items-center gap-2 text-sm ${
-                    formErrors.customPath ? 'border border-red-300' : ''
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 ml-1">{t('customAddress')}</label>
+                  <div className={`cute-input-wrapper bg-white dark:bg-slate-800 rounded-lg px-3 py-2 flex items-center gap-2 text-sm ${
+                    formErrors.customPath ? 'border border-red-300 dark:border-red-400' : ''
                   }`}>
-                    <span className="text-slate-400">{process.env.NEXT_PUBLIC_BASE_URL?.replace(/^https?:\/\//, '') || 'localhost:3000'}/</span>
+                    <span className="text-slate-400 dark:text-slate-500">{process.env.NEXT_PUBLIC_BASE_URL?.replace(/^https?:\/\//, '') || 'localhost:3000'}/</span>
                     <input 
                       type="text" 
                       placeholder={t('customAddressPlaceholder')}
-                      className="w-full outline-none text-slate-700"
+                      className="w-full outline-none text-slate-700 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500"
                       value={customPath}
                       onChange={(e) => {
                         setCustomPath(e.target.value)
@@ -626,15 +757,15 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
 
                 {/* 访问密码 */}
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1 ml-1">{t('password')}</label>
-                  <div className={`cute-input-wrapper bg-white rounded-lg px-3 py-2 flex items-center gap-2 text-sm ${
-                    formErrors.password ? 'border border-red-300' : ''
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 ml-1">{t('password')}</label>
+                  <div className={`cute-input-wrapper bg-white dark:bg-slate-800 rounded-lg px-3 py-2 flex items-center gap-2 text-sm ${
+                    formErrors.password ? 'border border-red-300 dark:border-red-400' : ''
                   }`}>
-                    <Lock size={14} className="text-slate-400" />
+                    <Lock size={14} className="text-slate-400 dark:text-slate-500" />
                     <input 
                       type="text" 
                       placeholder={t('passwordPlaceholder')}
-                      className="w-full outline-none text-slate-700"
+                      className="w-full outline-none text-slate-700 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500"
                       value={password}
                       onChange={(e) => {
                         setPassword(e.target.value)
@@ -652,15 +783,15 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
 
               {/* 第二行：过期时间 */}
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1 ml-1">{t('setExpirationTime')}</label>
-                <div className={`cute-input-wrapper bg-white rounded-lg px-3 py-2 flex items-center gap-2 text-sm ${
-                  formErrors.expiresAt ? 'border border-red-300' : ''
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 ml-1">{t('setExpirationTime')}</label>
+                <div className={`cute-input-wrapper bg-white dark:bg-slate-800 rounded-lg px-3 py-2 flex items-center gap-2 text-sm ${
+                  formErrors.expiresAt ? 'border border-red-300 dark:border-red-400' : ''
                 }`}>
-                  <Calendar size={14} className="text-slate-400" />
+                  <Calendar size={14} className="text-slate-400 dark:text-slate-500" />
                   <input 
                     type="datetime-local" 
                     placeholder={t('setExpirationTime')}
-                    className="w-full outline-none text-slate-700"
+                    className="w-full outline-none text-slate-700 dark:text-slate-200"
                     value={expiresAt}
                     onChange={(e) => {
                       setExpiresAt(e.target.value)
@@ -673,7 +804,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                 {formErrors.expiresAt && (
                   <p className="text-xs text-red-500 mt-1">{formErrors.expiresAt}</p>
                 )}
-                <p className="text-xs text-slate-500 mt-1">{t('leaveEmptyNeverExpire')}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t('leaveEmptyNeverExpire')}</p>
               </div>
 
               {/* 第三行：开关选项 */}
@@ -681,20 +812,20 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                 
                 {/* 开启过渡页 */}
                 <label className={`flex items-center justify-between p-3 rounded-lg border transition-colors group ${
-                  password.trim() ? 'border-slate-200 bg-slate-50 cursor-not-allowed opacity-60' : 'border-slate-100 hover:bg-slate-50 cursor-pointer'
+                  password.trim() ? 'border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 cursor-not-allowed opacity-60' : 'border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer'
                 }`}>
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-blue-50 text-[var(--color-primary)] flex items-center justify-center">
                       <Zap size={16} />
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-sm font-medium text-slate-700">{t('enableIntermediate')}</span>
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('enableIntermediate')}</span>
                       {password.trim() && (
                         <span className="text-xs text-slate-400">{t('autoDisabledWithPassword')}</span>
                       )}
                     </div>
                   </div>
-                  <div className="relative">
+                  <div className="relative w-10 h-6">
                     <input 
                       type="checkbox" 
                       className="peer sr-only cute-switch-checkbox" 
@@ -702,39 +833,49 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                       disabled={password.trim() !== ''}
                       onChange={() => handleEnableIntermediateChange(!enableIntermediate)} 
                     />
-                    <div className={`w-10 h-6 rounded-full transition-colors ${
-                      password.trim() ? 'bg-slate-300' : 'bg-slate-200 peer-checked:bg-[var(--color-primary)]'
-                    }`}>
-                      <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4 shadow-sm"></div>
-                    </div>
+                    <div className={`w-full h-full rounded-full transition-colors ${
+                      password.trim() 
+                        ? 'bg-slate-300 dark:bg-slate-600' 
+                        : enableIntermediate 
+                          ? 'bg-[var(--color-primary)]' 
+                          : 'bg-slate-200 dark:bg-slate-600'
+                    }`}></div>
+                    <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${
+                      enableIntermediate ? 'translate-x-4' : 'translate-x-0'
+                    }`}></div>
                   </div>
                 </label>
 
                 {/* 强制二次确认 */}
                 <label className={`flex items-center justify-between p-3 rounded-lg border transition-colors group ${
-                  password.trim() ? 'border-orange-200 bg-orange-50' : 'border-slate-100 hover:bg-slate-50'
+                  password.trim() ? 'border-orange-200 dark:border-orange-600 bg-orange-50 dark:bg-orange-900/30' : 'border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
                 } cursor-pointer`}>
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-orange-50 text-[var(--color-warning)] flex items-center justify-center">
                       <Shield size={16} />
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-sm font-medium text-slate-700">{t('enableConfirm')}</span>
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('enableConfirm')}</span>
                       {password.trim() && (
                         <span className="text-xs text-orange-500">{t('formAutoEnabledWithPassword')}</span>
                       )}
                     </div>
                   </div>
-                  <div className="relative">
+                  <div className="relative w-10 h-6">
                     <input 
                       type="checkbox" 
                       className="peer sr-only cute-switch-checkbox" 
                       checked={requireConfirm} 
                       onChange={() => handleRequireConfirmChange(!requireConfirm)} 
                     />
-                    <div className="w-10 h-6 bg-slate-200 rounded-full transition-colors peer-checked:bg-[var(--color-primary)]">
-                      <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4 shadow-sm"></div>
-                    </div>
+                    <div className={`w-full h-full rounded-full transition-colors ${
+                      requireConfirm 
+                        ? 'bg-[var(--color-primary)]' 
+                        : 'bg-slate-200 dark:bg-slate-600'
+                    }`}></div>
+                    <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${
+                      requireConfirm ? 'translate-x-4' : 'translate-x-0'
+                    }`}></div>
                   </div>
                 </label>
 
@@ -749,19 +890,19 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
         <div className={`cute-card p-4 mb-6 ${isClient ? 'animate__animated animate__fadeInUp' : ''}`}>
           {/* 搜索框 */}
           <div className="flex flex-col md:flex-row gap-3 mb-4">
-            <div className="cute-input-wrapper flex-1 bg-slate-50 rounded-lg px-4 py-3 flex items-center gap-3">
-              <Search className="text-slate-400" size={18} />
+            <div className="cute-input-wrapper flex-1 bg-slate-50 dark:bg-slate-800 rounded-lg px-4 py-3 flex items-center gap-3">
+              <Search className="text-slate-400 dark:text-slate-500" size={18} />
               <input 
                 type="text" 
                 placeholder={t('searchPlaceholder')}
-                className="flex-1 bg-transparent border-none outline-none text-slate-700 placeholder-slate-400"
+                className="flex-1 bg-transparent border-none outline-none text-slate-700 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
               {searchQuery && (
                 <button 
                   onClick={() => setSearchQuery('')}
-                  className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-slate-600 transition-colors"
+                  className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                 >
                   <X size={16} />
                 </button>
@@ -793,24 +934,46 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
               
               {/* 类型筛选 */}
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-2">{t('linkType')}</label>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">{t('linkType')}</label>
                 <div className="grid grid-cols-3 gap-2">
                   <button 
                     onClick={() => setFilterType('all')}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       filterType === 'all' 
-                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                        ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700' 
+                        : 'bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
                     }`}
                   >
                     {t('allFilter')}
                   </button>
                   <button 
+                    onClick={() => setFilterType('active')}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
+                      filterType === 'active' 
+                        ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700' 
+                        : 'bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
+                    }`}
+                  >
+                    <Check size={14} />
+                    {t('activeFilter')}
+                  </button>
+                  <button 
+                    onClick={() => setFilterType('expired')}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
+                      filterType === 'expired' 
+                        ? 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-700' 
+                        : 'bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
+                    }`}
+                  >
+                    <X size={14} />
+                    {t('expiredFilter')}
+                  </button>
+                  <button 
                     onClick={() => setFilterType('password')}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
                       filterType === 'password' 
-                        ? 'bg-orange-100 text-orange-700 border border-orange-200' 
-                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                        ? 'bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-700' 
+                        : 'bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
                     }`}
                   >
                     <Lock size={14} />
@@ -820,8 +983,8 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                     onClick={() => setFilterType('confirm')}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
                       filterType === 'confirm' 
-                        ? 'bg-green-100 text-green-700 border border-green-200' 
-                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                        ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700' 
+                        : 'bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
                     }`}
                   >
                     <Shield size={14} />
@@ -831,8 +994,8 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                     onClick={() => setFilterType('auto')}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
                       filterType === 'auto' 
-                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                        ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700' 
+                        : 'bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
                     }`}
                   >
                     <Zap size={14} />
@@ -842,8 +1005,8 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                     onClick={() => setFilterType('direct')}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
                       filterType === 'direct' 
-                        ? 'bg-purple-100 text-purple-700 border border-purple-200' 
-                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                        ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700' 
+                        : 'bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
                     }`}
                   >
                     <ExternalLink size={14} />
@@ -854,14 +1017,14 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
 
               {/* 排序选项 */}
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-2">{t('sortBy')}</label>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">{t('sortBy')}</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button 
                     onClick={() => setSortBy('newest')}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
                       sortBy === 'newest' 
-                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                        ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700' 
+                        : 'bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
                     }`}
                   >
                     <Calendar size={14} />
@@ -871,8 +1034,8 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                     onClick={() => setSortBy('oldest')}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
                       sortBy === 'oldest' 
-                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                        ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700' 
+                        : 'bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
                     }`}
                   >
                     <Calendar size={14} />
@@ -882,8 +1045,8 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                     onClick={() => setSortBy('views')}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
                       sortBy === 'views' 
-                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                        ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700' 
+                        : 'bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
                     }`}
                   >
                     <Eye size={14} />
@@ -893,8 +1056,8 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                     onClick={() => setSortBy('title')}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
                       sortBy === 'title' 
-                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                        ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700' 
+                        : 'bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
                     }`}
                   >
                     <SortAsc size={14} />
@@ -909,7 +1072,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
               <div className="flex justify-end pt-2 border-t border-slate-100">
                 <button 
                   onClick={clearSearch}
-                  className="px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                  className="px-3 py-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                 >
                   {t('clearFilter')}
                 </button>
@@ -919,14 +1082,16 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
 
           {/* 搜索结果统计 */}
           {(searchQuery || filterType !== 'all') && (
-            <div className="mt-3 pt-3 border-t border-slate-100 text-sm text-slate-500">
+            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 text-sm text-slate-500 dark:text-slate-400">
               {t('foundResults', { count: filteredAndSortedLinks.length })}
               {searchQuery && ` (${t('searchTerm')}: "${searchQuery}")`}
               {filterType !== 'all' && ` (${t('typeTerm')}: ${
                 filterType === 'password' ? t('passwordProtectedType') :
                 filterType === 'confirm' ? t('confirmType') :
                 filterType === 'auto' ? t('autoRedirectType') :
-                filterType === 'direct' ? t('directRedirectType') : ''
+                filterType === 'direct' ? t('directRedirectType') :
+                filterType === 'expired' ? t('expiredFilter') :
+                filterType === 'active' ? t('activeFilter') : ''
               })`}
             </div>
           )}
@@ -944,7 +1109,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
             {/* 短链信息行 */}
             <div className="p-4 flex flex-col md:flex-row items-center gap-4">
               {/* 图标 */}
-              <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center flex-shrink-0 text-slate-400">
+              <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-700 flex items-center justify-center flex-shrink-0 text-slate-400 dark:text-slate-500">
                 {link.hasPassword ? (
                   <Lock size={20} className="text-orange-600" />
                 ) : link.requireConfirm ? (
@@ -960,18 +1125,43 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
               <div className="flex-1 min-w-0 text-center md:text-left w-full">
                 <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
                   <h3 
-                    className="font-bold text-lg text-[var(--color-primary)] cursor-pointer hover:underline truncate"
+                    className={`font-bold text-lg cursor-pointer hover:underline truncate ${
+                      isLinkExpired(link) 
+                        ? 'text-red-500 dark:text-red-400 line-through' 
+                        : 'text-[var(--color-primary)]'
+                    }`}
                     onClick={() => onSimulateVisit(link)}
                   >
                     {link.shortUrl}
                   </h3>
-                  <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md border border-slate-200 hidden md:inline-block">
+                  <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-600 hidden md:inline-block">
                     {formatTimeAgo(new Date(link.createdAt))}
                   </span>
+                  {/* 过期状态标签 */}
+                  {isLinkExpired(link) && (
+                    <span className="text-xs bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-md border border-red-200 dark:border-red-700">
+                      {t('expiredFilter')}
+                    </span>
+                  )}
+                  {/* 过期时间显示 */}
+                  {link.expiresAt && !isLinkExpired(link) && (() => {
+                    const remaining = formatTimeRemaining(new Date(link.expiresAt))
+                    return (
+                      <span className="text-xs bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-md border border-orange-200 dark:border-orange-700">
+                        {remaining.isImminentExpiry ? t('imminentExpiry') : t('expiresIn', { time: remaining.time })}
+                      </span>
+                    )
+                  })()}
                 </div>
-                <p className="text-sm text-slate-500 truncate max-w-md mx-auto md:mx-0">
+                <p className="text-sm text-slate-500 dark:text-slate-400 truncate max-w-md mx-auto md:mx-0">
                   {link.title || link.originalUrl}
                 </p>
+                {/* 过期时间详细信息 */}
+                {link.expiresAt && (
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                    {t('expireTime')}: {new Date(link.expiresAt).toLocaleString('zh-CN')}
+                  </p>
+                )}
               </div>
 
               {/* 统计和操作 */}
@@ -1073,37 +1263,39 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
           className="backdrop:bg-black/50 bg-transparent p-4 rounded-2xl"
           onClick={(e) => e.target === adminDialogRef.current && closeAdminModal()}
         >
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate__animated animate__fadeIn animate__faster">
+          <div className={`rounded-2xl shadow-2xl max-w-md w-full p-6 animate__animated animate__fadeIn animate__faster ${isDarkMode ? 'bg-slate-800 text-slate-200' : 'bg-white text-gray-900'}`}>
             {/* 弹窗标题 */}
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <h3 className={`text-lg font-bold flex items-center gap-2 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
                 <Shield size={20} className="text-blue-500" />
                 {t('adminVerification')}
               </h3>
               <button 
                 onClick={closeAdminModal}
-                className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+                className={`p-1 rounded-lg transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-slate-500 hover:text-slate-300' : 'hover:bg-slate-100 text-slate-400 hover:text-slate-600'}`}
               >
                 <X size={20} />
               </button>
             </div>
 
             {/* 说明文字 */}
-            <p className="text-sm text-slate-600 mb-4">
+            <p className={`text-sm mb-4 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
               {t('viewPasswordRequiresAdmin')}
             </p>
 
             {/* 登录状态检查 */}
             <div className="mb-6">
-              <div className={`bg-slate-50 rounded-lg p-4 flex items-center gap-3 ${
-                adminError ? 'border border-red-300' : 'border border-slate-200'
+              <div className={`rounded-lg p-4 flex items-center gap-3 ${isDarkMode ? 'bg-slate-700' : 'bg-slate-50'} ${
+                adminError 
+                  ? `border ${isDarkMode ? 'border-red-500' : 'border-red-300'}` 
+                  : `border ${isDarkMode ? 'border-slate-600' : 'border-slate-200'}`
               }`}>
                 <Shield size={20} className={isAdminLoggedIn ? 'text-green-500' : 'text-slate-400'} />
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-slate-700">
+                  <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
                     {isAdminLoggedIn ? t('adminLoggedIn') : t('needAdminLogin')}
                   </p>
-                  <p className="text-xs text-slate-500">
+                  <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                     {isAdminLoggedIn ? t('clickToViewPassword') : t('pleaseLoginAdminFirst')}
                   </p>
                 </div>
@@ -1120,7 +1312,11 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
             <div className="flex gap-3">
               <button 
                 onClick={closeAdminModal}
-                className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors"
+                className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                  isDarkMode 
+                    ? 'bg-slate-700 hover:bg-slate-600 text-slate-200' 
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
                 disabled={loadingPassword}
               >
                 {t('cancel')}
@@ -1156,16 +1352,16 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
           className="backdrop:bg-black/50 bg-transparent p-4 rounded-2xl"
           onClick={(e) => e.target === passwordDialogRef.current && setShowPasswordModal(false)}
         >
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate__animated animate__fadeIn animate__faster">
+          <div className={`rounded-2xl shadow-2xl max-w-md w-full p-6 animate__animated animate__fadeIn animate__faster ${isDarkMode ? 'bg-slate-800 text-slate-200' : 'bg-white text-gray-900'}`}>
             {/* 弹窗标题 */}
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <h3 className={`text-lg font-bold flex items-center gap-2 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
                 <Lock size={20} className="text-orange-500" />
                 {t('linkPassword')}
               </h3>
               <button 
                 onClick={closePasswordModal}
-                className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+                className={`p-1 rounded-lg transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-slate-500 hover:text-slate-300' : 'hover:bg-slate-100 text-slate-400 hover:text-slate-600'}`}
               >
                 <X size={20} />
               </button>
@@ -1173,22 +1369,26 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
 
             {/* 密码显示区域 */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-slate-600 mb-2">
+              <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                 {t('accessPasswordLabel')}
               </label>
-              <div className="cute-input-wrapper bg-slate-50 rounded-lg px-4 py-3 flex items-center gap-3">
-                <Lock size={16} className="text-slate-400" />
+              <div className={`cute-input-wrapper rounded-lg px-4 py-3 flex items-center gap-3 ${isDarkMode ? 'bg-slate-700' : 'bg-slate-50'}`}>
+                <Lock size={16} className={isDarkMode ? 'text-slate-500' : 'text-slate-400'} />
                 <input 
                   type="text" 
                   value={currentPassword}
                   readOnly
-                  className="flex-1 bg-transparent border-none outline-none text-slate-800 font-mono"
+                  className={`flex-1 bg-transparent border-none outline-none font-mono ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}
                   placeholder={currentPassword ? "" : t('gettingPassword')}
                 />
                 {currentPassword && (
                   <button 
                     onClick={() => copyToClipboard(currentPassword, 'password')}
-                    className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-[var(--color-primary)] transition-colors"
+                    className={`p-1 rounded transition-colors hover:text-[var(--color-primary)] ${
+                      isDarkMode 
+                        ? 'hover:bg-slate-600 text-slate-400' 
+                        : 'hover:bg-slate-200 text-slate-500'
+                    }`}
                     title={copySuccess === 'password' ? t('copied') : t('copy')}
                   >
                     {copySuccess === 'password' ? (
@@ -1200,7 +1400,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                 )}
               </div>
               {currentPassword && (
-                <p className="text-xs text-slate-500 mt-2">
+                <p className={`text-xs mt-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                   {t('passwordLength', { length: currentPassword.length })}
                 </p>
               )}
@@ -1210,7 +1410,11 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
             <div className="flex justify-end">
               <button 
                 onClick={closePasswordModal}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors"
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  isDarkMode 
+                    ? 'bg-slate-700 hover:bg-slate-600 text-slate-200' 
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
               >
                 {t('close')}
               </button>
