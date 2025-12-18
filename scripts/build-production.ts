@@ -118,11 +118,11 @@ fs.copyFileSync(
   path.join(distDir, 'package.json')
 )
 
-// 复制 prisma 目录
+// 复制 prisma 目录（排除 migrations）
 const prismaDir = path.join(rootDir, 'prisma')
 if (fs.existsSync(prismaDir)) {
-  console.log('  - 复制 prisma 目录...')
-  copyDirectory(prismaDir, path.join(distDir, 'prisma'))
+  console.log('  - 复制 prisma 目录（排除 migrations）...')
+  copyPrismaDirectory(prismaDir, path.join(distDir, 'prisma'))
 }
 
 // 复制 next.config.ts
@@ -229,6 +229,25 @@ if (fs.existsSync(envExample)) {
   fs.copyFileSync(envExample, path.join(distDir, '.env.example'))
 }
 
+// 复制必要的启动脚本
+console.log('  - 复制启动相关脚本...')
+const scriptsDir = path.join(distDir, 'scripts')
+fs.mkdirSync(scriptsDir, { recursive: true })
+
+// 复制 setup-schema.js（启动时必需）
+const setupSchemaFile = path.join(rootDir, 'scripts', 'setup-schema.js')
+if (fs.existsSync(setupSchemaFile)) {
+  fs.copyFileSync(setupSchemaFile, path.join(scriptsDir, 'setup-schema.js'))
+  console.log('    ✓ setup-schema.js')
+}
+
+// 复制 init-db.ts（数据库初始化时需要）
+const initDbFile = path.join(rootDir, 'scripts', 'init-db.ts')
+if (fs.existsSync(initDbFile)) {
+  fs.copyFileSync(initDbFile, path.join(scriptsDir, 'init-db.ts'))
+  console.log('    ✓ init-db.ts')
+}
+
 console.log('✓ 文件复制完成\n')
 
 // 5. 为生产环境创建干净的数据库
@@ -274,24 +293,95 @@ fs.writeFileSync(
 
 console.log('✓ 部署信息已生成\n')
 
-// 5. 显示构建结果
-console.log('✅ 生产环境构建完成！\n')
+// 7. 清理根目录的数据库文件（避免被意外打包）
+console.log('🧹 清理根目录数据库文件...')
+const dbFiles = ['dev.db', 'dev.db-journal', 'dev.db-wal']
+dbFiles.forEach(file => {
+  const dbPath = path.join(rootDir, file)
+  if (fs.existsSync(dbPath)) {
+    fs.unlinkSync(dbPath)
+    console.log(`  ✓ 清理 ${file}`)
+  }
+})
+console.log('✓ 根目录数据库文件已清理\n')
+
+// 8. 自动创建部署包
+console.log('📦 自动创建部署包...\n')
+try {
+  // 创建完整包
+  console.log('🗜️ 创建完整部署包...')
+  execSync('tsx scripts/create-deployment-package.ts full', {
+    stdio: 'inherit',
+    cwd: rootDir
+  })
+  
+  // 创建更新包
+  console.log('🗜️ 创建更新包...')
+  execSync('tsx scripts/create-deployment-package.ts update', {
+    stdio: 'inherit',
+    cwd: rootDir
+  })
+  
+  console.log('✅ 所有部署包创建完成！\n')
+} catch (error) {
+  console.error('❌ 创建部署包失败:', error)
+  console.log('可以手动运行以下命令创建部署包:')
+  console.log('  bun run package:prod     # 完整包')
+  console.log('  bun run package:update   # 更新包')
+}
+
+// 9. 显示构建结果
+console.log('✅ 生产环境构建和打包完成！\n')
 console.log('📦 构建产物位置:', distDir)
 console.log('📊 构建信息:')
 console.log(`   - 构建时间: ${buildInfo.buildTime}`)
 console.log(`   - Node 版本: ${buildInfo.nodeVersion}`)
 console.log(`   - Next.js 版本: ${buildInfo.nextVersion}`)
-console.log('\n🚀 部署步骤:')
-console.log('   1. 将 dist 目录上传到服务器')
-console.log('   2. 在 dist 目录中运行: bun install --production')
-console.log('   3. 配置环境变量: cp .env.example .env')
-console.log('   4. 初始化数据库: bunx prisma generate && bunx prisma db push && bun run db:init')
-console.log('   5. 启动服务: node start.js 或 bun start.js')
-console.log('\n💡 提示: 可以使用 PM2 管理进程: pm2 start start.js --name link-app\n')
+
+// 显示生成的包文件
+const buildDir = path.join(rootDir, 'build')
+if (fs.existsSync(buildDir)) {
+  const dateStr = new Date().toISOString().slice(0, 10)
+  const fullPackage = `link-app-production-${dateStr}.tar.gz`
+  const updatePackage = `link-app-production-${dateStr}-update.tar.gz`
+  
+  console.log('\n📦 生成的部署包:')
+  if (fs.existsSync(path.join(buildDir, fullPackage))) {
+    const fullStats = fs.statSync(path.join(buildDir, fullPackage))
+    console.log(`   - 完整包: ${fullPackage} (${(fullStats.size / (1024 * 1024)).toFixed(2)} MB)`)
+  }
+  if (fs.existsSync(path.join(buildDir, updatePackage))) {
+    const updateStats = fs.statSync(path.join(buildDir, updatePackage))
+    console.log(`   - 更新包: ${updatePackage} (${(updateStats.size / (1024 * 1024)).toFixed(2)} MB)`)
+  }
+}
+
+console.log('\n🚀 部署说明:')
+console.log('完整包部署（全新部署）:')
+console.log('   1. 将完整包上传到服务器')
+console.log('   2. 解压: tar -xzf link-app-production-*.tar.gz')
+console.log('   3. 安装依赖: bun install --production')
+console.log('   4. 配置环境: cp .env.example .env && 编辑 .env')
+console.log('   5. 初始化数据库: bunx prisma generate && bunx prisma db push && bun run db:init')
+console.log('   6. 启动服务: node start.js 或 pm2 start start.js --name link-app')
+
+console.log('\n更新包部署（更新现有部署）:')
+console.log('   1. 停止现有服务: pm2 stop link-app')
+console.log('   2. 备份当前版本: cp -r /path/to/app /path/to/app-backup')
+console.log('   3. 将更新包上传到服务器')
+console.log('   4. 解压到应用目录: tar -xzf link-app-production-*-update.tar.gz')
+console.log('   5. 安装/更新依赖: bun install --production')
+console.log('   6. 重新生成 Prisma 客户端: bunx prisma generate')
+console.log('   7. 重启服务: pm2 restart link-app')
+
+console.log('\n💡 提示:')
+console.log('- 更新包不会覆盖现有数据库和配置文件')
+console.log('- 建议在更新前备份整个应用目录')
+console.log('- 可通过 /api/health 检查服务状态\n')
 
 }
 
-// 辅助函数：递归复制目录
+// 辅助函数：递归复制目录，排除数据库文件
 function copyDirectory(src: string, dest: string) {
   if (!fs.existsSync(src)) {
     console.warn(`⚠️  源目录不存在: ${src}`)
@@ -302,7 +392,48 @@ function copyDirectory(src: string, dest: string) {
   
   const entries = fs.readdirSync(src, { withFileTypes: true })
   
+  // 需要排除的数据库文件
+  const excludeFiles = ['dev.db', 'dev.db-journal', 'dev.db-wal']
+  
   for (const entry of entries) {
+    // 跳过数据库文件
+    if (excludeFiles.includes(entry.name)) {
+      console.log(`    ⏭️  跳过数据库文件: ${entry.name}`)
+      continue
+    }
+    
+    const srcPath = path.join(src, entry.name)
+    const destPath = path.join(dest, entry.name)
+    
+    if (entry.isDirectory()) {
+      copyDirectory(srcPath, destPath)
+    } else {
+      fs.copyFileSync(srcPath, destPath)
+    }
+  }
+}
+
+// 辅助函数：复制 Prisma 目录，排除 migrations 和数据库文件
+function copyPrismaDirectory(src: string, dest: string) {
+  if (!fs.existsSync(src)) {
+    console.warn(`⚠️  源目录不存在: ${src}`)
+    return
+  }
+
+  fs.mkdirSync(dest, { recursive: true })
+  
+  const entries = fs.readdirSync(src, { withFileTypes: true })
+  
+  // 需要排除的文件和目录
+  const excludeItems = ['migrations', 'dev.db', 'dev.db-journal', 'dev.db-wal']
+  
+  for (const entry of entries) {
+    // 跳过 migrations 目录和数据库文件
+    if (excludeItems.includes(entry.name)) {
+      console.log(`    ⏭️  跳过: prisma/${entry.name}`)
+      continue
+    }
+    
     const srcPath = path.join(src, entry.name)
     const destPath = path.join(dest, entry.name)
     
