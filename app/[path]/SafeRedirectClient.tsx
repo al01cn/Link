@@ -18,6 +18,7 @@ interface SafeRedirectClientProps {
   enableIntermediate: boolean
   autoFillPassword?: string
   expiresAt?: string // 添加过期时间字段
+  autoRedirect?: boolean // 添加自动重定向标志
 }
 
 export default function SafeRedirectClient({ 
@@ -28,8 +29,28 @@ export default function SafeRedirectClient({
   requireConfirm, 
   enableIntermediate,
   autoFillPassword,
-  expiresAt
+  expiresAt,
+  autoRedirect = false
 }: SafeRedirectClientProps) {
+  // 如果是自动重定向模式，立即跳转，不渲染任何内容
+  useEffect(() => {
+    if (autoRedirect) {
+      window.location.href = targetUrl
+    }
+  }, [autoRedirect, targetUrl])
+
+  // 如果是自动重定向模式，返回空白页面或加载指示器
+  if (autoRedirect) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-2"></div>
+          <p className="text-gray-500 text-sm">正在跳转...</p>
+        </div>
+      </div>
+    )
+  }
+
   const { t, language, setLanguage } = useLanguage()
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')

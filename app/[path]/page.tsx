@@ -50,7 +50,19 @@ export default async function ShortLinkPage({ params, searchParams }: PageProps)
         })
       ])
       
-      redirect(shortLink.originalUrl)
+      // 使用客户端重定向组件来避免 Next.js 16 的 redirect 问题
+      return (
+        <SafeRedirectClient 
+          path={path}
+          targetUrl={shortLink.originalUrl}
+          title={shortLink.title || undefined}
+          hasPassword={false}
+          requireConfirm={false}
+          enableIntermediate={false}
+          autoRedirect={true}
+          expiresAt={shortLink.expiresAt?.toISOString()}
+        />
+      )
     }
 
     // 需要显示中间页面

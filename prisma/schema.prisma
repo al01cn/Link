@@ -1,10 +1,10 @@
-// PostgreSQL 数据库配置
+// SQLite 数据库配置
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
