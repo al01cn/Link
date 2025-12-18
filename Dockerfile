@@ -76,14 +76,21 @@ COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/lib ./lib
 
 # 创建数据目录并设置权限
-RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
-RUN mkdir -p /app/logs && chown -R nextjs:nodejs /app/logs
+RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data && chmod 755 /app/data
+RUN mkdir -p /app/logs && chown -R nextjs:nodejs /app/logs && chmod 755 /app/logs
 
 # 设置环境变量
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV DATABASE_URL="file:/app/data/database.db"
+
+# 复制数据库修复脚本和启动脚本
+COPY --from=builder /app/scripts/fix-database-deployment.ts ./scripts/
+COPY --from=builder /app/scripts/docker-entrypoint.sh ./scripts/
+
+# 设置启动脚本权限
+RUN chmod +x ./scripts/docker-entrypoint.sh
 
 # 切换到非 root 用户
 USER nextjs
@@ -95,5 +102,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3000/api/health || exit 1
 
-# 启动应用
+# 使用启动脚本
+ENTRYPOINT ["./scripts/docker-entrypoint.sh"]
 CMD ["bun", "run", "start:prod"]

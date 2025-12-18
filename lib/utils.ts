@@ -1,5 +1,37 @@
 import { nanoid } from 'nanoid'
 
+// 获取动态的基础URL
+export function getBaseUrl(): string {
+  // 优先使用环境变量
+  if (process.env.NEXT_PUBLIC_BASE_URL) {
+    return process.env.NEXT_PUBLIC_BASE_URL
+  }
+  
+  // 在客户端，从当前窗口获取
+  if (typeof window !== 'undefined') {
+    return `${window.location.protocol}//${window.location.host}`
+  }
+  
+  // 服务端fallback（这种情况下应该设置环境变量）
+  return 'http://localhost:3000'
+}
+
+// 获取动态的主机名（不包含协议）
+export function getHostname(): string {
+  // 优先使用环境变量
+  if (process.env.NEXT_PUBLIC_BASE_URL) {
+    return process.env.NEXT_PUBLIC_BASE_URL.replace(/^https?:\/\//, '')
+  }
+  
+  // 在客户端，从当前窗口获取
+  if (typeof window !== 'undefined') {
+    return window.location.host
+  }
+  
+  // 服务端fallback
+  return 'localhost:3000'
+}
+
 // 生成短链路径
 export function generateShortPath(length: number = 6): string {
   return nanoid(length)

@@ -238,7 +238,7 @@ fs.mkdirSync(prodDbPath, { recursive: true })
 
 // 创建生产环境的环境变量文件
 const prodEnvContent = `# 生产环境配置
-DATABASE_URL="file:./data/database.db"
+DATABASE_URL="file:./dev.db"
 NEXT_PUBLIC_BASE_URL="https://your-domain.com"
 ENCRYPTION_KEY="your-secret-encryption-key-here"
 NODE_ENV="production"
@@ -248,9 +248,13 @@ DB_MAX_CONNECTIONS=10
 DB_CONNECTION_TIMEOUT=5000
 DB_IDLE_TIMEOUT=300000
 CACHE_TTL=300000
+
+# Cloudflare Turnstile 人机验证配置
+NEXT_PUBLIC_TURNSTILE_SITE_KEY="3x00000000000000000000FF"
+TURNSTILE_SECRET_KEY="1x0000000000000000000000000000000AA"
 `
 
-fs.writeFileSync(path.join(distDir, '.env.production'), prodEnvContent)
+fs.writeFileSync(path.join(distDir, '.env'), prodEnvContent)
 console.log('✓ 生产环境配置文件已创建\n')
 
 // 6. 生成部署信息

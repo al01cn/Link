@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link2, Lock, Shield, Zap, X, ExternalLink, Calendar, Save, AlertCircle } from 'lucide-react'
 import { useConfirmDialog } from '@/lib/useDialog'
 import { useLanguage } from '@/lib/LanguageContext'
+import { getHostname } from '@/lib/utils'
 import ConfirmDialog from './ConfirmDialog'
 
 interface ShortLink {
@@ -289,7 +290,7 @@ export default function EditLinkDialog({
                 errors.customPath ? 'border-red-300 ring-1 ring-red-300' : ''
               }`}>
                 <span className="text-slate-400 text-sm">
-                  {process.env.NEXT_PUBLIC_BASE_URL?.replace(/^https?:\/\//, '') || 'localhost:3000'}/
+                  {getHostname()}/
                 </span>
                 <input 
                   type="text" 

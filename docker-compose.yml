@@ -22,8 +22,8 @@ services:
       - CACHE_TTL=300000
       - API_RATE_LIMIT=100
     volumes:
-      - app_data:/app/data
-      - app_logs:/app/logs
+      - ./data:/app/data
+      - ./logs:/app/logs
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]

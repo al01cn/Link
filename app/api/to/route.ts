@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { isValidUrl, fetchPageTitle } from '@/lib/utils'
+import { isValidUrl, fetchPageTitle, getBaseUrl } from '@/lib/utils'
 import { logActivity, logError } from '@/lib/logger'
 import { useTranslation } from '@/lib/translations'
 import { requestCache } from '@/lib/requestCache'

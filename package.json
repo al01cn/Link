@@ -26,6 +26,7 @@
     "db:optimize": "tsx scripts/optimize-db.ts",
     "setup": "prisma generate && prisma db push && bun run db:init",
     "setup:prod": "prisma generate && prisma migrate deploy && bun run db:init",
+    "db:fix": "tsx scripts/fix-database-deployment.ts",
     "perf:monitor": "tsx scripts/performance-monitor.ts",
     "cache:clear": "tsx scripts/clear-cache.ts",
     "health:check": "tsx scripts/health-check.ts"

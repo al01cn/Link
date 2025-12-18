@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { translateForRequest } from '@/lib/translations'
+import { getBaseUrl } from '@/lib/utils'
 
 /**
  * 动态生成OpenAPI规范（Generate OpenAPI specification dynamically）
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
      * 基础URL地址（Base URL address）
      * @type {string}
      */
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    const baseUrl = getBaseUrl()
     
     /**
      * 获取语言参数（Get language parameter）

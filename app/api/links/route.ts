@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { generateShortPath, isValidUrl, fetchPageTitle, extractDomain, checkDomainAccessServer } from '@/lib/utils'
+import { generateShortPath, isValidUrl, fetchPageTitle, extractDomain, checkDomainAccessServer, getBaseUrl } from '@/lib/utils'
 import { encryptPassword } from '@/lib/crypto'
 import { logCreate, logError } from '@/lib/logger'
 import { translateForRequest } from '@/lib/translations'
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
         existingLink: {
           id: existingUrl.id,
           path: existingUrl.path,
-          shortUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/${existingUrl.path}`
+          shortUrl: `${getBaseUrl()}/${existingUrl.path}`
         }
       }, { status: 409 })
     }
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       id: shortLink.id,
       path: shortLink.path,
-      shortUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/${shortLink.path}`,
+      shortUrl: `${getBaseUrl()}/${shortLink.path}`,
       originalUrl: shortLink.originalUrl,
       title: shortLink.title,
       views: shortLink.views,
@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
       take: 50
     })
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    const baseUrl = getBaseUrl()
     
     const formattedLinks = links.map(link => ({
       id: link.id,

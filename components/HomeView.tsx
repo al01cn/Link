@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link2, ArrowRight, Settings, ChevronDown, Lock, Shield, Zap, Eye, Copy, Trash2, X, Search, Filter, Calendar, SortAsc, SortDesc, MousePointer, ExternalLink, Edit, Check } from 'lucide-react'
-import { formatTimeAgo, formatTimeRemaining } from '@/lib/utils'
+import { formatTimeAgo, formatTimeRemaining, getHostname } from '@/lib/utils'
 import { TranslationKey } from '@/lib/translations'
 import { useConfirmDialog, useNotificationDialog } from '@/lib/useDialog'
 import { requestCache } from '@/lib/requestCache'
@@ -736,7 +736,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                   <div className={`cute-input-wrapper bg-white dark:bg-slate-800 rounded-lg px-3 py-2 flex items-center gap-2 text-sm ${
                     formErrors.customPath ? 'border border-red-300 dark:border-red-400' : ''
                   }`}>
-                    <span className="text-slate-400 dark:text-slate-500">{process.env.NEXT_PUBLIC_BASE_URL?.replace(/^https?:\/\//, '') || 'localhost:3000'}/</span>
+                    <span className="text-slate-400 dark:text-slate-500">{getHostname()}/</span>
                     <input 
                       type="text" 
                       placeholder={t('customAddressPlaceholder')}

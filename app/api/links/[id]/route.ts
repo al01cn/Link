@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { decryptPassword, encryptPassword } from '@/lib/crypto'
 import { verifyAdminToken } from '@/lib/adminAuth'
-import { isValidUUID, isValidUrl, fetchPageTitle, extractDomain, checkDomainAccessServer } from '@/lib/utils'
+import { isValidUUID, isValidUrl, fetchPageTitle, extractDomain, checkDomainAccessServer, getBaseUrl } from '@/lib/utils'
 import { translateForRequest } from '@/lib/translations'
 
 // 获取单个短链信息（包括密码）
@@ -162,7 +162,7 @@ export async function PUT(
       }
     })
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    const baseUrl = getBaseUrl()
 
     return NextResponse.json({
       id: updatedLink.id,

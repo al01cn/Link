@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Lock, Shield, Zap, ExternalLink, Calendar, Save, AlertCircle } from 'lucide-react'
 import { useLanguage } from '@/lib/LanguageContext'
+import { getHostname } from '@/lib/utils'
 
 interface ShortLink {
   id: string
@@ -208,7 +209,7 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
                   errors.customPath ? 'border-red-300 dark:border-red-400' : ''
                 }`}>
                   <span className="text-slate-400 dark:text-slate-500 text-sm">
-                    {process.env.NEXT_PUBLIC_BASE_URL?.replace(/^https?:\/\//, '') || 'localhost:3000'}/
+                    {getHostname()}/
                   </span>
                   <input 
                     type="text" 
