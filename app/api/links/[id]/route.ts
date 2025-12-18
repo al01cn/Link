@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { decryptPassword, encryptPassword } from '@/lib/crypto'
 import { verifyAdminToken } from '@/lib/adminAuth'
-import { isValidUUID, isValidUrl, fetchPageTitle, extractDomain, checkDomainAccessServer, getBaseUrl } from '@/lib/utils'
+import { isValidUUID, isValidUrl, fetchPageTitle, extractDomain, checkDomainAccessServer, getBaseUrl, generateShortUrl } from '@/lib/utils'
 import { translateForRequest } from '@/lib/translations'
 
 // 获取单个短链信息（包括密码）
@@ -162,12 +162,10 @@ export async function PUT(
       }
     })
 
-    const baseUrl = getBaseUrl(request)
-
     return NextResponse.json({
       id: updatedLink.id,
       path: updatedLink.path,
-      shortUrl: `${baseUrl}/${updatedLink.path}`,
+      shortUrl: generateShortUrl(updatedLink.path, request),
       originalUrl: updatedLink.originalUrl,
       title: updatedLink.title,
       views: updatedLink.views,

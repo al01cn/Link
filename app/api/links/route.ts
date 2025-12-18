@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { generateShortPath, isValidUrl, fetchPageTitle, extractDomain, checkDomainAccessServer, getBaseUrl } from '@/lib/utils'
+import { generateShortPath, isValidUrl, fetchPageTitle, extractDomain, checkDomainAccessServer, getBaseUrl, generateShortUrl } from '@/lib/utils'
 import { encryptPassword } from '@/lib/crypto'
 import { logCreate, logError } from '@/lib/logger'
 import { translateForRequest } from '@/lib/translations'
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
         existingLink: {
           id: existingUrl.id,
           path: existingUrl.path,
-          shortUrl: `${getBaseUrl(request)}/${existingUrl.path}`
+          shortUrl: generateShortUrl(existingUrl.path, request)
         }
       }, { status: 409 })
     }
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       id: shortLink.id,
       path: shortLink.path,
-      shortUrl: `${getBaseUrl(request)}/${shortLink.path}`,
+      shortUrl: generateShortUrl(shortLink.path, request),
       originalUrl: shortLink.originalUrl,
       title: shortLink.title,
       views: shortLink.views,
@@ -161,12 +161,10 @@ export async function GET(request: NextRequest) {
       take: 50
     })
 
-    const baseUrl = getBaseUrl(request)
-    
     const formattedLinks = links.map(link => ({
       id: link.id,
       path: link.path,
-      shortUrl: `${baseUrl}/${link.path}`,
+      shortUrl: generateShortUrl(link.path, request),
       originalUrl: link.originalUrl,
       title: link.title,
       views: link.views,

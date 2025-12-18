@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { translateForRequest } from '@/lib/translations'
-import { getBaseUrl } from '@/lib/utils'
+import { getBaseUrl, generateShortUrl } from '@/lib/utils'
 
 /**
  * 动态生成OpenAPI规范（Generate OpenAPI specification dynamically）

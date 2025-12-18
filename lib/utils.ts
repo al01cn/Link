@@ -33,6 +33,28 @@ export function getBaseUrl(request?: Request): string {
   return `http://localhost:${port}`
 }
 
+// 生成短链 URL（优先级：环境变量 > 请求 host > 只返回路径）
+export function generateShortUrl(path: string, request?: Request): string {
+  // 1. 优先使用环境变量
+  if (process.env.NEXT_PUBLIC_BASE_URL) {
+    return `${process.env.NEXT_PUBLIC_BASE_URL}/${path}`
+  }
+  
+  // 2. 其次从请求头获取 host
+  if (request) {
+    const host = request.headers.get('host')
+    const protocol = request.headers.get('x-forwarded-proto') || 
+                    (request.headers.get('x-forwarded-ssl') === 'on' ? 'https' : 'http')
+    
+    if (host) {
+      return `${protocol}://${host}/${path}`
+    }
+  }
+  
+  // 3. 如果都获取不到，只返回路径
+  return path
+}
+
 // 获取动态的主机名（不包含协议）
 export function getHostname(request?: Request): string {
   // 优先使用环境变量
