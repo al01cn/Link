@@ -19,6 +19,7 @@
 
 # production
 /build
+build/
 
 # misc
 .DS_Store
@@ -34,6 +35,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -47,3 +49,4 @@ test/
 /lib/generated/prisma
 原型/
 设计方案/
+dist/

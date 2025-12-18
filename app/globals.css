@@ -236,7 +236,7 @@ body {
 
 /* 卡片样式 */
 .cute-card {
-  background: white;
+  background-color: white;
   border-radius: var(--radius-lg);
   transition: transform 0.3s var(--ease-spring), box-shadow 0.3s var(--ease-spring);
   border: 1px solid #F1F5F9;
@@ -249,7 +249,7 @@ body {
 
 /* 暗色模式卡片样式 */
 .dark .cute-card {
-  background: #334155;
+  background-color: #334155 !important;
   border-color: #475569;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); /* 暗色模式下的黑色阴影 */
 }

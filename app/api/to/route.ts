@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isValidUrl, fetchPageTitle } from '@/lib/utils'
 import { logActivity, logError } from '@/lib/logger'
 import { useTranslation } from '@/lib/translations'
+import { requestCache } from '@/lib/requestCache'
+import { apiCache } from '@/lib/apiCache'
 
 /**
  * 跳转类型枚举（Redirect type enumeration）
@@ -75,16 +77,49 @@ interface QuickRedirectResponse {
  * @see {@link TokenConfig} Token配置接口（Token configuration interface）
  * @see {@link QuickRedirectResponse} 响应数据接口（Response data interface）
  */
-export async function GET(request: NextRequest): Promise<NextResponse<QuickRedirectResponse | { error: string }>> {
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const startTime = Date.now()
+  
   // 获取语言偏好（Get language preference）
   const acceptLanguage = request.headers.get('accept-language') || 'zh'
   const language = acceptLanguage.includes('en') ? 'en' : 'zh'
   const t = useTranslation(language)
   
   try {
+    // 生成缓存键
+    const url = new URL(request.url)
+    const cacheKey = `to:${url.search}`
     
-    // 解析查询参数（Parse query parameters）
-    const { searchParams } = new URL(request.url)
+    // 尝试从缓存获取结果
+    const cachedResult = await requestCache.get(
+      cacheKey,
+      async () => {
+        return await processToRequest(request, t)
+      },
+      { ttl: 60000, staleWhileRevalidate: true } // 1分钟缓存，支持后台更新
+    )
+    
+    // 添加性能头部
+    const processingTime = Date.now() - startTime
+    const response = NextResponse.json(cachedResult)
+    response.headers.set('X-Processing-Time', `${processingTime}ms`)
+    response.headers.set('X-Cache-Status', 'processed')
+    
+    return response
+  } catch (error) {
+    /**
+     * 错误处理（Error handling）
+     * @description 捕获并记录所有未预期的错误，返回通用错误响应（Catch and log all unexpected errors, return generic error response）
+     */
+    console.error(t('processQuickRedirectFailed') + ':', error)
+    await logError(t('processQuickRedirectFailed'), error, request)
+    return NextResponse.json({ error: t('apiServerError') }, { status: 500 })
+  }
+}
+
+async function processToRequest(request: NextRequest, t: any): Promise<QuickRedirectResponse> {
+  // 解析查询参数（Parse query parameters）
+  const { searchParams } = new URL(request.url)
     /** URL参数：目标链接地址（URL parameter: target link address） */
     const urlParam = searchParams.get('url')
     /** Token参数：Base64编码的JSON配置（Token parameter: Base64 encoded JSON configuration） */
@@ -92,10 +127,10 @@ export async function GET(request: NextRequest): Promise<NextResponse<QuickRedir
     /** Type参数：跳转类型控制（Type parameter: redirect type control） */
     const typeParam = searchParams.get('type')
 
-    // 参数验证：url和token必须提供其中一个（Parameter validation: either url or token must be provided）
-    if (!urlParam && !tokenParam) {
-      return NextResponse.json({ error: t('apiMissingUrlOrToken') }, { status: 400 })
-    }
+  // 参数验证：url和token必须提供其中一个（Parameter validation: either url or token must be provided）
+  if (!urlParam && !tokenParam) {
+    throw new Error(t('apiMissingUrlOrToken'))
+  }
 
     // 初始化配置变量（Initialize configuration variables）
     /** 目标URL地址（Target URL address） */
@@ -148,7 +183,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<QuickRedir
 
         // Token配置验证（Token configuration validation）
         if (!tokenConfig.url) {
-          return NextResponse.json({ error: t('tokenMissingUrlField') }, { status: 400 })
+          throw new Error(t('tokenMissingUrlField'))
         }
 
         // 应用Token配置（Apply Token configuration）
@@ -163,7 +198,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<QuickRedir
       } catch (error: unknown) {
         // 提供更详细的错误信息以便调试
         let errorMessage = t('invalidTokenFormat');
-        let debugInfo: any = {};
+        const debugInfo: any = {};
         
         if (error instanceof SyntaxError) {
           errorMessage = t('tokenNotValidJson');
@@ -193,10 +228,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<QuickRedir
           debugInfo
         });
         
-        return NextResponse.json({ 
-          error: errorMessage,
-          details: process.env.NODE_ENV === 'development' ? debugInfo : undefined
-        }, { status: 400 })
+        throw new Error(errorMessage)
       }
     } else {
       /**
@@ -214,62 +246,57 @@ export async function GET(request: NextRequest): Promise<NextResponse<QuickRedir
       }
     }
 
-    /**
-     * URL格式验证（URL format validation）
-     * @description 使用工具函数验证目标URL的格式是否正确（Use utility function to validate target URL format）
-     */
-    if (!isValidUrl(targetUrl)) {
-      return NextResponse.json({ error: t('invalidUrlFormat') }, { status: 400 })
-    }
+  /**
+   * URL格式验证（URL format validation）
+   * @description 使用工具函数验证目标URL的格式是否正确（Use utility function to validate target URL format）
+   */
+  if (!isValidUrl(targetUrl)) {
+    throw new Error(t('invalidUrlFormat'))
+  }
 
-    /**
-     * 页面标题获取（Page title fetching）
-     * @description 如果Token中没有提供title，尝试自动获取目标页面的标题（If title is not provided in Token, try to automatically fetch target page title）
-     */
-    if (!title) {
-      title = await fetchPageTitle(targetUrl)
-    }
+  /**
+   * 页面标题获取（Page title fetching）
+   * @description 如果Token中没有提供title，尝试自动获取目标页面的标题（If title is not provided in Token, try to automatically fetch target page title）
+   */
+  if (!title) {
+    // 使用缓存获取页面标题，避免重复请求
+    title = await requestCache.get(
+      `title:${targetUrl}`,
+      () => fetchPageTitle(targetUrl),
+      { ttl: 300000 } // 5分钟缓存
+    )
+  }
 
-    /**
-     * 记录TO跳转准备日志（Record TO redirect preparation log）
-     * @description 记录通过TO路径准备跳转的请求，实际访问统计将在真正跳转时记录（Record TO path redirect preparation request, actual visit statistics will be recorded when actually redirecting）
-     */
-    await logActivity({
-      type: 'prepare',
-      message: `${t('toPrepareRedirect')}: ${targetUrl}`,
-      details: {
-        targetUrl,
-        title: title || t('externalLink'),
-        type: redirectType,
-        msg,
-        captchaEnabled,
-        source: tokenParam ? 'token' : 'url'
-      },
-      request
-    })
-
-    /**
-     * 构建响应数据（Build response data）
-     * @description 返回包含所有跳转配置的JSON响应（Return JSON response containing all redirect configurations）
-     */
-    const response: QuickRedirectResponse = {
-      originalUrl: targetUrl,
+  /**
+   * 记录TO跳转准备日志（Record TO redirect preparation log）
+   * @description 记录通过TO路径准备跳转的请求，实际访问统计将在真正跳转时记录（Record TO path redirect preparation request, actual visit statistics will be recorded when actually redirecting）
+   */
+  await logActivity({
+    type: 'prepare',
+    message: `${t('toPrepareRedirect')}: ${targetUrl}`,
+    details: {
+      targetUrl,
       title: title || t('externalLink'),
       type: redirectType,
-      enableIntermediate: true,
       msg,
-      captchaEnabled
-    }
+      captchaEnabled,
+      source: tokenParam ? 'token' : 'url'
+    },
+    request
+  })
 
-    return NextResponse.json(response)
-
-  } catch (error) {
-    /**
-     * 错误处理（Error handling）
-     * @description 捕获并记录所有未预期的错误，返回通用错误响应（Catch and log all unexpected errors, return generic error response）
-     */
-    console.error(t('processQuickRedirectFailed') + ':', error)
-    await logError(t('processQuickRedirectFailed'), error, request)
-    return NextResponse.json({ error: t('apiServerError') }, { status: 500 })
+  /**
+   * 构建响应数据（Build response data）
+   * @description 返回包含所有跳转配置的JSON响应（Return JSON response containing all redirect configurations）
+   */
+  const response: QuickRedirectResponse = {
+    originalUrl: targetUrl,
+    title: title || t('externalLink'),
+    type: redirectType,
+    enableIntermediate: true,
+    msg,
+    captchaEnabled
   }
+
+  return response
 }

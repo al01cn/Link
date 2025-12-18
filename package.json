@@ -5,8 +5,13 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:prod": "tsx scripts/build-production.ts",
+    "package:prod": "tsx scripts/create-deployment-package.ts",
     "start": "next start",
+    "start:prod": "NODE_ENV=production next start",
     "lint": "eslint",
+    "lint:fix": "eslint --fix",
+    "type-check": "tsc --noEmit",
     "test": "vitest --run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
@@ -14,10 +19,16 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
+    "db:migrate:prod": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "db:init": "tsx scripts/init-db.ts",
     "db:reset": "prisma migrate reset --force",
-    "setup": "prisma generate && prisma db push && bun run db:init"
+    "db:optimize": "tsx scripts/optimize-db.ts",
+    "setup": "prisma generate && prisma db push && bun run db:init",
+    "setup:prod": "prisma generate && prisma migrate deploy && bun run db:init",
+    "perf:monitor": "tsx scripts/performance-monitor.ts",
+    "cache:clear": "tsx scripts/clear-cache.ts",
+    "health:check": "tsx scripts/health-check.ts"
   },
   "dependencies": {
     "@marsidev/react-turnstile": "^1.4.0",
