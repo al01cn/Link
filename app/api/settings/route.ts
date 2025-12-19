@@ -37,6 +37,11 @@ export async function GET(request: NextRequest) {
       where: { key: 'auto_fill_password_enabled' }
     })
     
+    // 获取NanoID长度设置
+    const nanoidLength = await prisma.setting.findUnique({
+      where: { key: 'nanoid_length' }
+    })
+    
     // 获取域名规则
     const domainRules = await prisma.domainRule.findMany({
       where: { active: true },
@@ -49,6 +54,7 @@ export async function GET(request: NextRequest) {
       captchaEnabled: captchaEnabled?.value === 'true',
       preloadEnabled: preloadEnabled?.value !== 'false', // 默认启用
       autoFillPasswordEnabled: autoFillPasswordEnabled?.value !== 'false', // 默认启用
+      nanoidLength: parseInt(nanoidLength?.value || '6'), // 默认6个字符
       domainRules
     })
   } catch (error) {
@@ -67,7 +73,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { securityMode, waitTime, captchaEnabled, preloadEnabled, autoFillPasswordEnabled } = body
+    const { securityMode, waitTime, captchaEnabled, preloadEnabled, autoFillPasswordEnabled, nanoidLength } = body
     
     // 更新安全模式
     if (securityMode) {
@@ -111,6 +117,17 @@ export async function PUT(request: NextRequest) {
         where: { key: 'auto_fill_password_enabled' },
         update: { value: autoFillPasswordEnabled.toString() },
         create: { key: 'auto_fill_password_enabled', value: autoFillPasswordEnabled.toString() }
+      })
+    }
+    
+    // 更新NanoID长度
+    if (nanoidLength !== undefined) {
+      // 验证长度范围
+      const length = Math.max(5, Math.min(20, parseInt(nanoidLength)))
+      await prisma.setting.upsert({
+        where: { key: 'nanoid_length' },
+        update: { value: length.toString() },
+        create: { key: 'nanoid_length', value: length.toString() }
       })
     }
     

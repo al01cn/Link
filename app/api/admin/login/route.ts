@@ -41,6 +41,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: translateForRequest(request, 'apiInvalidCredentials') }, { status: 401 })
     }
 
+    // 检查是否使用默认密码（直接检查密码内容，而不是依赖 isDefault 字段）
+    const isUsingDefaultPassword = await bcrypt.compare('Loooong123', admin.password)
+
     // 生成JWT token
     const token = jwt.sign(
       { adminId: admin.id, username: admin.username },
@@ -51,7 +54,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       token,
-      isDefault: admin.isDefault,
+      isDefault: isUsingDefaultPassword, // 基于实际密码内容判断，而不是数据库字段
       username: admin.username
     })
 

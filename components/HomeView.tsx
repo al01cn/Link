@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link2, ArrowRight, Settings, ChevronDown, Lock, Shield, Zap, Eye, Copy, Trash2, X, Search, Filter, Calendar, SortAsc, SortDesc, MousePointer, ExternalLink, Edit, Check } from 'lucide-react'
-import { formatTimeAgo, formatTimeRemaining } from '@/lib/utils'
+import { formatTimeAgo, formatTimeRemaining, truncateDomain, truncateUrl } from '@/lib/utils'
 import { useHostname } from '@/lib/useHostname'
 import { TranslationKey } from '@/lib/translations'
 import { useLanguage } from '@/lib/LanguageContext'
@@ -300,10 +300,8 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
     if (customPath.trim()) {
       if (!/^[a-zA-Z0-9_-]+$/.test(customPath)) {
         errors.customPath = t('pathOnlyLettersNumbers')
-      } else if (customPath.length < 3) {
+      } else if (customPath.length < 1) {
         errors.customPath = t('pathMinLength')
-      } else if (customPath.length > 50) {
-        errors.customPath = t('pathMaxLength')
       }
     }
 
@@ -808,11 +806,16 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
               <div className="grid md:grid-cols-2 gap-4">
                 {/* 自定义地址 */}
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 ml-1">{t('customAddress')}</label>
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 ml-1">
+                    {hostname && (
+                      <span className="text-slate-400 dark:text-slate-500" title={hostname}>
+                        {truncateDomain(hostname, 25)}/
+                      </span>
+                    )}
+                  </label>
                   <div className={`cute-input-wrapper bg-white dark:bg-slate-800 rounded-lg px-3 py-2 flex items-center gap-2 text-sm ${
                     formErrors.customPath ? 'border border-red-300 dark:border-red-400' : ''
                   }`}>
-                    {hostname && <span className="text-slate-400 dark:text-slate-500">{hostname}/</span>}
                     <input 
                       type="text" 
                       placeholder={t('customAddressPlaceholder')}
@@ -1208,7 +1211,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                     }`}
                     onClick={() => onSimulateVisit(link)}
                   >
-                    {link.shortUrl}
+                    {truncateUrl(link.shortUrl, 9, link.hasPassword)}
                   </h3>
                   <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-600 hidden md:inline-block">
                     {formatTimeAgo(new Date(link.createdAt), language)}

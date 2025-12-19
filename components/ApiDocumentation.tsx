@@ -168,44 +168,72 @@ const getApiEndpoints = (t: (key: any, params?: Record<string, string | number>)
   {
     method: 'GET',
     path: '/api/settings',
-    summary: t('getSystemSettings'),
-    description: t('getSystemSettingsDesc'),
+    summary: t('getSystemSettings') + ' 🔒',
+    description: t('getSystemSettingsDesc') + ' ' + t('adminRequired'),
     responses: {
       '200': {
         description: t('apiGetSuccess'),
         example: {
           securityMode: 'blacklist',
           waitTime: 3,
+          captchaEnabled: false,
+          preloadEnabled: true,
+          autoFillPasswordEnabled: true,
+          nanoidLength: 6,
           domainRules: [
             { id: 1, domain: 'example.com', type: 'whitelist', active: true, createdAt: '2024-01-01T00:00:00Z' }
           ]
         }
       },
+      '401': { description: t('apiAdminRequired') },
       '500': { description: '服务器错误' }
     }
   },
   {
     method: 'PUT',
     path: '/api/settings',
-    summary: t('updateSystemSettings'),
-    description: t('updateSystemSettingsDesc'),
+    summary: t('updateSystemSettings') + ' 🔒',
+    description: t('updateSystemSettingsDesc') + ' ' + t('adminRequired'),
     requestBody: {
       type: 'object',
       properties: {
         securityMode: { type: 'string', required: false, description: t('securityModeDesc'), example: 'blacklist' },
-        waitTime: { type: 'number', required: false, description: t('waitTimeDesc'), example: 3 }
+        waitTime: { type: 'number', required: false, description: t('waitTimeDesc'), example: 3 },
+        captchaEnabled: { type: 'boolean', required: false, description: t('captchaEnabledDesc'), example: false },
+        preloadEnabled: { type: 'boolean', required: false, description: t('preloadEnabledDesc'), example: true },
+        autoFillPasswordEnabled: { type: 'boolean', required: false, description: t('autoFillPasswordEnabledDesc'), example: true },
+        nanoidLength: { type: 'number', required: false, description: t('nanoidLengthDesc'), example: 6 }
       }
     },
     responses: {
       '200': { description: t('apiUpdateSuccess'), example: { success: true } },
+      '401': { description: t('apiAdminRequired') },
+      '500': { description: t('apiServerError') }
+    }
+  },
+  {
+    method: 'GET',
+    path: '/api/public-settings',
+    summary: t('getPublicSettings'),
+    description: t('getPublicSettingsDesc'),
+    responses: {
+      '200': {
+        description: t('apiGetSuccess'),
+        example: {
+          waitTime: 3,
+          captchaEnabled: false,
+          preloadEnabled: true,
+          autoFillPasswordEnabled: true
+        }
+      },
       '500': { description: t('apiServerError') }
     }
   },
   {
     method: 'GET',
     path: '/api/domains',
-    summary: t('getDomainRules'),
-    description: t('getDomainRulesDesc'),
+    summary: t('getDomainRules') + ' 🔒',
+    description: t('getDomainRulesDesc') + ' ' + t('adminRequired'),
     parameters: [
       { name: 'type', type: 'string', required: false, description: t('ruleTypeDesc'), example: 'whitelist' }
     ],
@@ -216,14 +244,15 @@ const getApiEndpoints = (t: (key: any, params?: Record<string, string | number>)
           { id: 1, domain: 'example.com', type: 'whitelist', active: true, createdAt: '2024-01-01T00:00:00Z' }
         ]
       },
+      '401': { description: t('apiAdminRequired') },
       '500': { description: t('apiServerError') }
     }
   },
   {
     method: 'POST',
     path: '/api/domains',
-    summary: t('addDomainRule'),
-    description: t('addDomainRuleDesc'),
+    summary: t('addDomainRule') + ' 🔒',
+    description: t('addDomainRuleDesc') + ' ' + t('adminRequired'),
     requestBody: {
       type: 'object',
       properties: {
@@ -237,6 +266,7 @@ const getApiEndpoints = (t: (key: any, params?: Record<string, string | number>)
         example: { id: 1, domain: 'example.com', type: 'whitelist', active: true, createdAt: '2024-01-01T00:00:00Z' }
       },
       '400': { description: t('apiInvalidDomainFormat') },
+      '401': { description: t('apiAdminRequired') },
       '500': { description: t('apiServerError') }
     }
   },
@@ -293,10 +323,29 @@ const getApiEndpoints = (t: (key: any, params?: Record<string, string | number>)
     }
   },
   {
+    method: 'GET',
+    path: '/api/admin/check-default',
+    summary: t('checkDefaultPassword') + ' 🔒',
+    description: t('checkDefaultPasswordDesc') + ' ' + t('adminRequired'),
+    responses: {
+      '200': {
+        description: t('apiGetSuccess'),
+        example: {
+          success: true,
+          isDefault: false,
+          username: 'admin'
+        }
+      },
+      '401': { description: t('apiAdminRequired') },
+      '404': { description: t('apiAdminNotFound') },
+      '500': { description: t('apiServerError') }
+    }
+  },
+  {
     method: 'POST',
     path: '/api/admin/change-password',
-    summary: t('changeAdminPassword'),
-    description: t('changeAdminPasswordDesc'),
+    summary: t('changeAdminPassword') + ' 🔒',
+    description: t('changeAdminPasswordDesc') + ' ' + t('adminRequired'),
     requestBody: {
       type: 'object',
       properties: {
@@ -359,8 +408,8 @@ const getApiEndpoints = (t: (key: any, params?: Record<string, string | number>)
   {
     method: 'DELETE',
     path: '/api/domains/{id}',
-    summary: t('deleteDomainRule'),
-    description: t('deleteDomainRuleDesc'),
+    summary: t('deleteDomainRule') + ' 🔒',
+    description: t('deleteDomainRuleDesc') + ' ' + t('adminRequired'),
     parameters: [
       { name: 'id', type: 'string', required: true, description: t('domainRuleUuidDesc'), example: '123e4567-e89b-12d3-a456-426614174000' }
     ],
@@ -374,7 +423,270 @@ const getApiEndpoints = (t: (key: any, params?: Record<string, string | number>)
         }
       },
       '400': { description: t('apiInvalidIdFormat') },
+      '401': { description: t('apiAdminRequired') },
       '404': { description: t('apiDomainRuleNotFound') },
+      '500': { description: t('apiServerError') }
+    }
+  },
+  {
+    method: 'GET',
+    path: '/api/config/export',
+    summary: t('exportConfig') + ' 🔒',
+    description: t('exportConfigDesc') + ' ' + t('adminRequired'),
+    parameters: [
+      { name: 'type', type: 'string', required: false, description: t('exportTypeDesc'), example: 'all' },
+      { name: 'token', type: 'string', required: true, description: t('adminTokenDesc'), example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' }
+    ],
+    responses: {
+      '200': {
+        description: t('exportSuccess'),
+        example: {
+          version: '1.0',
+          exportTime: '2024-12-18T10:00:00Z',
+          type: 'all',
+          settings: { securityMode: 'blacklist', waitTime: 3 },
+          domainRules: [{ domain: 'example.com', type: 'whitelist', active: true }],
+          links: [{ id: 'uuid-1', path: 'abc123', originalUrl: 'https://example.com' }]
+        }
+      },
+      '401': { description: t('apiAdminRequired') },
+      '500': { description: t('apiServerError') }
+    }
+  },
+  {
+    method: 'POST',
+    path: '/api/config/import',
+    summary: t('importConfig') + ' 🔒',
+    description: t('importConfigDesc') + ' ' + t('adminRequired'),
+    requestBody: {
+      type: 'object',
+      properties: {
+        data: { type: 'object', required: true, description: t('configDataDesc'), example: {} },
+        type: { type: 'string', required: false, description: t('importTypeDesc'), example: 'all' }
+      }
+    },
+    responses: {
+      '200': {
+        description: t('importSuccess'),
+        example: {
+          success: true,
+          message: t('importSuccess'),
+          importedCount: 15
+        }
+      },
+      '400': { description: t('apiInvalidConfigData') },
+      '401': { description: t('apiAdminRequired') },
+      '500': { description: t('apiServerError') }
+    }
+  },
+  {
+    method: 'GET',
+    path: '/api/health',
+    summary: t('healthCheck'),
+    description: t('healthCheckDesc'),
+    responses: {
+      '200': {
+        description: t('systemHealthy'),
+        example: {
+          status: 'healthy',
+          timestamp: '2024-12-18T10:00:00Z',
+          uptime: 86400,
+          version: '1.0.0',
+          checks: {
+            database: { status: 'healthy', responseTime: 25, message: t('databaseNormal') },
+            memory: { status: 'healthy', usage: { used: 128, total: 512, percentage: 25 }, message: t('memoryNormal') },
+            cache: { status: 'healthy', stats: { size: 1024, hitRate: 0.85 }, message: t('cacheNormal') },
+            api: { status: 'healthy', metrics: { totalRequests: 10000, averageResponseTime: 150, errorRate: 0.01 }, message: t('apiNormal') }
+          }
+        }
+      },
+      '503': { description: t('systemUnhealthy') }
+    }
+  },
+  {
+    method: 'POST',
+    path: '/api/verify-turnstile',
+    summary: t('verifyTurnstile'),
+    description: t('verifyTurnstileDesc'),
+    requestBody: {
+      type: 'object',
+      properties: {
+        token: { type: 'string', required: true, description: t('turnstileTokenDesc'), example: 'turnstile-response-token' }
+      }
+    },
+    responses: {
+      '200': {
+        description: t('verificationSuccess'),
+        example: {
+          success: true,
+          message: t('verificationSuccess')
+        }
+      },
+      '400': {
+        description: t('verificationFailed'),
+        example: {
+          success: false,
+          error: t('captchaFailed'),
+          details: ['invalid-input-response']
+        }
+      },
+      '500': { description: t('captchaServiceError') }
+    }
+  },
+  {
+    method: 'DELETE',
+    path: '/api/logs/cleanup',
+    summary: t('cleanupLogs') + ' 🔒',
+    description: t('cleanupLogsDesc') + ' ' + t('adminRequired'),
+    parameters: [
+      { name: 'days', type: 'number', required: false, description: t('retentionDaysDesc'), example: 30 }
+    ],
+    responses: {
+      '200': {
+        description: t('cleanupSuccess'),
+        example: {
+          success: true,
+          deletedCount: 1234
+        }
+      },
+      '400': { description: t('apiInvalidParams') },
+      '401': { description: t('apiAdminRequired') },
+      '500': { description: t('apiServerError') }
+    }
+  },
+  {
+    method: 'GET',
+    path: '/api/logs/export',
+    summary: t('exportLogs') + ' 🔒',
+    description: t('exportLogsDesc') + ' ' + t('adminRequired'),
+    parameters: [
+      { name: 'format', type: 'string', required: false, description: t('exportFormatDesc'), example: 'csv' },
+      { name: 'startDate', type: 'string', required: false, description: t('startDateDesc'), example: '2024-12-01' },
+      { name: 'endDate', type: 'string', required: false, description: t('endDateDesc'), example: '2024-12-18' },
+      { name: 'type', type: 'string', required: false, description: t('logTypeDesc'), example: 'visit' },
+      { name: 'limit', type: 'number', required: false, description: t('exportLimitDesc'), example: 10000 }
+    ],
+    responses: {
+      '200': { description: t('exportFileDownload') },
+      '401': { description: t('apiAdminRequired') },
+      '500': { description: t('apiServerError') }
+    }
+  },
+  {
+    method: 'POST',
+    path: '/api/track-visit/{path}',
+    summary: t('trackVisit'),
+    description: t('trackVisitDesc'),
+    parameters: [
+      { name: 'path', type: 'string', required: true, description: t('shortLinkPathDesc'), example: 'abc123' }
+    ],
+    responses: {
+      '200': {
+        description: t('trackSuccess'),
+        example: { success: true }
+      },
+      '404': { description: t('apiLinkNotFound') },
+      '410': { description: t('apiLinkExpired') },
+      '500': { description: t('apiServerError') }
+    }
+  },
+  {
+    method: 'POST',
+    path: '/api/track-to-visit',
+    summary: t('trackToVisit'),
+    description: t('trackToVisitDesc'),
+    requestBody: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', required: true, description: t('targetUrlDesc'), example: 'https://example.com' }
+      }
+    },
+    responses: {
+      '200': {
+        description: t('trackSuccess'),
+        example: { success: true, message: t('visitRecorded') }
+      },
+      '500': { description: t('apiServerError') }
+    }
+  },
+  {
+    method: 'GET',
+    path: '/api/logs/stats',
+    summary: t('getLogStats') + ' 🔒',
+    description: t('getLogStatsDesc') + ' ' + t('adminRequired'),
+    parameters: [
+      { name: 'period', type: 'string', required: false, description: t('statsPeriodDesc'), example: '7d' },
+      { name: 'linkId', type: 'string', required: false, description: t('linkIdDesc'), example: 'uuid-string' },
+      { name: 'type', type: 'string', required: false, description: t('statsTypeDesc'), example: 'summary' }
+    ],
+    responses: {
+      '200': {
+        description: t('apiGetSuccess'),
+        example: {
+          total: 1234,
+          todayCount: 89,
+          yesterdayCount: 67,
+          thisWeekCount: 456,
+          thisMonthCount: 1234,
+          typeStats: { visit: 800, admin: 200, error: 34 },
+          levelStats: { info: 1000, warn: 200, error: 34 },
+          categoryStats: { access: 800, system: 400, security: 34 },
+          riskLevelStats: { low: 1000, medium: 200, high: 34 },
+          last24Hours: [{ hour: '2024-12-18T10:00:00Z', count: 45 }],
+          last7Days: [{ date: '2024-12-18', count: 89 }],
+          topLinks: [{ id: 'uuid-1', path: 'abc123', visits: 234 }],
+          topReferrers: [{ referer: 'https://google.com', visits: 123 }],
+          avgResponseTime: 150,
+          slowRequests: 5
+        }
+      },
+      '401': { description: t('apiAdminRequired') },
+      '500': { description: t('apiServerError') }
+    }
+  },
+  {
+    method: 'GET',
+    path: '/api/logs',
+    summary: t('getLogs') + ' 🔒',
+    description: t('getLogsDesc') + ' ' + t('adminRequired'),
+    parameters: [
+      { name: 'page', type: 'number', required: false, description: t('pageNumberDesc'), example: 1 },
+      { name: 'limit', type: 'number', required: false, description: t('pageLimitDesc'), example: 50 },
+      { name: 'type', type: 'string', required: false, description: t('logTypeDesc'), example: 'visit' },
+      { name: 'level', type: 'string', required: false, description: t('logLevelDesc'), example: 'info' },
+      { name: 'category', type: 'string', required: false, description: t('logCategoryDesc'), example: 'access' },
+      { name: 'riskLevel', type: 'string', required: false, description: t('riskLevelDesc'), example: 'low' },
+      { name: 'startDate', type: 'string', required: false, description: t('startDateDesc'), example: '2024-12-01' },
+      { name: 'endDate', type: 'string', required: false, description: t('endDateDesc'), example: '2024-12-18' },
+      { name: 'search', type: 'string', required: false, description: t('searchTermDesc'), example: 'keyword' },
+      { name: 'sortBy', type: 'string', required: false, description: t('sortFieldDesc'), example: 'createdAt' },
+      { name: 'sortOrder', type: 'string', required: false, description: t('sortOrderDesc'), example: 'desc' }
+    ],
+    responses: {
+      '200': {
+        description: t('apiGetSuccess'),
+        example: {
+          logs: [
+            {
+              id: 'log-uuid',
+              type: 'visit',
+              level: 'info',
+              category: 'access',
+              message: '短链访问: abc123',
+              details: { path: 'abc123', originalUrl: 'https://example.com' },
+              ip: '192.168.1.1',
+              userAgent: 'Mozilla/5.0...',
+              riskLevel: 'low',
+              createdAt: '2024-12-18T11:00:00Z'
+            }
+          ],
+          total: 500,
+          page: 1,
+          limit: 50,
+          totalPages: 10
+        }
+      },
+      '401': { description: t('apiAdminRequired') },
       '500': { description: t('apiServerError') }
     }
   },
@@ -577,7 +889,7 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
   /** 当前复制的文本标识（Current copied text identifier） */
   const [copiedText, setCopiedText] = useState<string | null>(null)
   /** 当前激活的标签页（Currently active tab） */
-  const [activeTab, setActiveTab] = useState<'endpoints' | 'to-rules' | 'password-autofill' | 'openapi'>('endpoints')
+  const [activeTab, setActiveTab] = useState<'endpoints' | 'authentication' | 'to-rules' | 'password-autofill' | 'openapi'>('endpoints')
   /** 当前主题状态 */
   const [isDarkMode, setIsDarkMode] = useState(false)
 
@@ -720,6 +1032,15 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
                 }`}
             >
               {t('apiEndpoints')}
+            </button>
+            <button
+              onClick={() => setActiveTab('authentication')}
+              className={`px-3 sm:px-6 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${activeTab === 'authentication'
+                  ? `border-blue-500 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`
+                  : `border-transparent ${isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-gray-600 hover:text-gray-900'}`
+                }`}
+            >
+              {t('adminAuthentication')}
             </button>
             <button
               onClick={() => setActiveTab('to-rules')}
@@ -912,6 +1233,182 @@ export default function ApiDocumentation({ isOpen, onClose }: ApiDocumentationPr
                   </div>
                 )
               })}
+            </div>
+          ) : activeTab === 'authentication' ? (
+            <div className="space-y-6">
+              {/* 管理员认证 */}
+              <div>
+                <h3 className={`text-lg font-bold mb-2 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('adminAuthentication')}</h3>
+                <p className={`mb-4 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+                  {t('authenticationDesc')}
+                </p>
+                
+                {/* 认证流程 */}
+                <div className={`border rounded-lg p-4 mb-6 ${isDarkMode ? 'bg-blue-900/20 border-blue-700' : 'bg-blue-50 border-blue-200'}`}>
+                  <h4 className={`font-semibold mb-2 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('authenticationFlow')}</h4>
+                  <ol className={`text-sm space-y-2 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+                    <li className="flex items-start gap-2">
+                      <span className="bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">1</span>
+                      <span>{t('authStep1')}</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">2</span>
+                      <span>{t('authStep2')}</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">3</span>
+                      <span>{t('authStep3')}</span>
+                    </li>
+                  </ol>
+                </div>
+
+                {/* 获取Token */}
+                <div>
+                  <h4 className={`font-semibold mb-3 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('getAdminToken')}</h4>
+                  <div className={`border rounded-lg p-4 ${isDarkMode ? 'border-slate-600 bg-slate-800' : 'border-gray-200 bg-white'}`}>
+                    <p className={`text-sm mb-3 ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>
+                      {t('getTokenDesc')}
+                    </p>
+                    <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-slate-900 text-slate-200' : 'bg-gray-900 text-gray-100'}`}>
+                      <pre className="text-green-400 text-sm overflow-x-auto">
+{`POST /api/admin/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "your_password"
+}`}
+                      </pre>
+                    </div>
+                    <p className={`text-sm mt-3 ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>
+                      {t('responseExample')}
+                    </p>
+                    <div className={`p-3 rounded-lg mt-2 ${isDarkMode ? 'bg-slate-900 text-slate-200' : 'bg-gray-900 text-gray-100'}`}>
+                      <pre className="text-blue-400 text-sm overflow-x-auto">
+{`{
+  "success": true,
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "isDefault": false,
+  "username": "admin"
+}`}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 使用Token */}
+                <div>
+                  <h4 className={`font-semibold mb-3 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('useTokenCallApi')}</h4>
+                  <div className={`border rounded-lg p-4 ${isDarkMode ? 'border-slate-600 bg-slate-800' : 'border-gray-200 bg-white'}`}>
+                    <p className={`text-sm mb-3 ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>
+                      {t('useTokenDesc')}
+                    </p>
+                    <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-slate-900 text-slate-200' : 'bg-gray-900 text-gray-100'}`}>
+                      <pre className="text-green-400 text-sm overflow-x-auto">
+{`curl -X GET "${typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}/api/settings" \\
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \\
+  -H "Content-Type: application/json"`}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Token管理 */}
+                <div>
+                  <h4 className={`font-semibold mb-3 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('tokenManagement')}</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className={`border rounded-lg p-4 ${isDarkMode ? 'border-green-700 bg-green-900/20' : 'border-green-200 bg-green-50'}`}>
+                      <h5 className={`font-medium mb-2 ${isDarkMode ? 'text-green-300' : 'text-green-900'}`}>{t('tokenValidity')}</h5>
+                      <p className={`text-sm ${isDarkMode ? 'text-green-400' : 'text-green-700'}`}>
+                        {t('tokenValidityDesc')}
+                      </p>
+                    </div>
+                    <div className={`border rounded-lg p-4 ${isDarkMode ? 'border-blue-700 bg-blue-900/20' : 'border-blue-200 bg-blue-50'}`}>
+                      <h5 className={`font-medium mb-2 ${isDarkMode ? 'text-blue-300' : 'text-blue-900'}`}>{t('tokenStorage')}</h5>
+                      <p className={`text-sm ${isDarkMode ? 'text-blue-400' : 'text-blue-700'}`}>
+                        {t('tokenStorageDesc')}
+                      </p>
+                    </div>
+                    <div className={`border rounded-lg p-4 ${isDarkMode ? 'border-purple-700 bg-purple-900/20' : 'border-purple-200 bg-purple-50'}`}>
+                      <h5 className={`font-medium mb-2 ${isDarkMode ? 'text-purple-300' : 'text-purple-900'}`}>{t('permissionVerification')}</h5>
+                      <p className={`text-sm ${isDarkMode ? 'text-purple-400' : 'text-purple-700'}`}>
+                        {t('permissionVerificationDesc')}
+                      </p>
+                    </div>
+                    <div className={`border rounded-lg p-4 ${isDarkMode ? 'border-orange-700 bg-orange-900/20' : 'border-orange-200 bg-orange-50'}`}>
+                      <h5 className={`font-medium mb-2 ${isDarkMode ? 'text-orange-300' : 'text-orange-900'}`}>{t('securityRecommendation')}</h5>
+                      <p className={`text-sm ${isDarkMode ? 'text-orange-400' : 'text-orange-700'}`}>
+                        {t('securityRecommendationDesc')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 错误处理 */}
+                <div>
+                  <h4 className={`font-semibold mb-3 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('errorHandling')}</h4>
+                  <div className="space-y-3">
+                    <div className={`border rounded-lg p-4 ${isDarkMode ? 'border-red-700 bg-red-900/20' : 'border-red-200 bg-red-50'}`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`px-2 py-1 rounded text-xs font-bold ${isDarkMode ? 'bg-red-900/50 text-red-300' : 'bg-red-100 text-red-800'}`}>401</span>
+                        <span className={`font-medium ${isDarkMode ? 'text-red-300' : 'text-red-900'}`}>{t('unauthorizedAccess')}</span>
+                      </div>
+                      <p className={`text-sm ${isDarkMode ? 'text-red-400' : 'text-red-700'}`}>
+                        {t('unauthorizedDesc')}
+                      </p>
+                    </div>
+                    <div className={`border rounded-lg p-4 ${isDarkMode ? 'border-orange-700 bg-orange-900/20' : 'border-orange-200 bg-orange-50'}`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`px-2 py-1 rounded text-xs font-bold ${isDarkMode ? 'bg-orange-900/50 text-orange-300' : 'bg-orange-100 text-orange-800'}`}>403</span>
+                        <span className={`font-medium ${isDarkMode ? 'text-orange-300' : 'text-orange-900'}`}>{t('insufficientPermissions')}</span>
+                      </div>
+                      <p className={`text-sm ${isDarkMode ? 'text-orange-400' : 'text-orange-700'}`}>
+                        {t('insufficientPermissionsDesc')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* API示例 */}
+                <div>
+                  <h4 className={`font-semibold mb-3 ${isDarkMode ? 'text-slate-200' : 'text-gray-900'}`}>{t('completeApiExample')}</h4>
+                  <div className={`border rounded-lg p-4 ${isDarkMode ? 'border-slate-600 bg-slate-800' : 'border-gray-200 bg-white'}`}>
+                    <div className="space-y-4">
+                      <div>
+                        <p className={`text-sm mb-2 ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>1. {t('loginGetToken')}</p>
+                        <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-slate-900 text-slate-200' : 'bg-gray-900 text-gray-100'}`}>
+                          <pre className="text-green-400 text-sm overflow-x-auto">
+{`curl -X POST "${typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}/api/admin/login" \\
+  -H "Content-Type: application/json" \\
+  -d '{"username":"admin","password":"admin123"}'`}
+                          </pre>
+                        </div>
+                      </div>
+                      <div>
+                        <p className={`text-sm mb-2 ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>2. {t('useTokenCallAdminApi')}</p>
+                        <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-slate-900 text-slate-200' : 'bg-gray-900 text-gray-100'}`}>
+                          <pre className="text-green-400 text-sm overflow-x-auto">
+{`curl -X GET "${typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}/api/settings" \\
+  -H "Authorization: Bearer YOUR_JWT_TOKEN_HERE" \\
+  -H "Content-Type: application/json"`}
+                          </pre>
+                        </div>
+                      </div>
+                      <div>
+                        <p className={`text-sm mb-2 ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>3. {t('modifySystemSettings')}</p>
+                        <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-slate-900 text-slate-200' : 'bg-gray-900 text-gray-100'}`}>
+                          <pre className="text-green-400 text-sm overflow-x-auto">
+{`curl -X PUT "${typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}/api/settings" \\
+  -H "Authorization: Bearer YOUR_JWT_TOKEN_HERE" \\
+  -H "Content-Type: application/json" \\
+  -d '{"waitTime":5,"captchaEnabled":true}'`}
+                          </pre>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : activeTab === 'to-rules' ? (
             <div className="space-y-6">

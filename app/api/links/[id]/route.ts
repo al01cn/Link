@@ -87,11 +87,8 @@ export async function PUT(
       if (!/^[a-zA-Z0-9_-]+$/.test(customPath)) {
         return NextResponse.json({ error: translateForRequest(request, 'pathOnlyLettersNumbers') }, { status: 400 })
       }
-      if (customPath.length < 3) {
+      if (customPath.length < 1) {
         return NextResponse.json({ error: translateForRequest(request, 'pathMinLength') }, { status: 400 })
-      }
-      if (customPath.length > 50) {
-        return NextResponse.json({ error: translateForRequest(request, 'pathMaxLength') }, { status: 400 })
       }
     }
 

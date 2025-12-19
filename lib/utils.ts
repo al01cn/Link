@@ -9,17 +9,43 @@ export function getBaseUrl(request?: Request): string {
   
   // 在客户端，从当前窗口获取
   if (typeof window !== 'undefined') {
-    return `${window.location.protocol}//${window.location.host}`
+    const protocol = window.location.protocol
+    const hostname = window.location.hostname
+    const port = window.location.port
+    
+    // 判断是否需要显示端口
+    const shouldShowPort = port && 
+                          !((protocol === 'http:' && port === '80') || 
+                            (protocol === 'https:' && port === '443'))
+    
+    const hostWithPort = shouldShowPort ? `${hostname}:${port}` : hostname
+    
+    return `${protocol}//${hostWithPort}`
   }
   
   // 服务端：尝试从请求头获取
   if (request) {
     const host = request.headers.get('host')
-    const protocol = request.headers.get('x-forwarded-proto') || 
-                    (request.headers.get('x-forwarded-ssl') === 'on' ? 'https' : 'http')
+    let protocol = request.headers.get('x-forwarded-proto') || 
+                   (request.headers.get('x-forwarded-ssl') === 'on' ? 'https' : 'http')
+    
+    // 如果设置了强制 HTTPS 环境变量，则使用 HTTPS
+    if (process.env.NEXT_PUBLIC_FORCE_HTTPS === 'true') {
+      protocol = 'https'
+    }
     
     if (host) {
-      return `${protocol}://${host}`
+      // 解析 host 和 port
+      const [hostname, port] = host.split(':')
+      
+      // 判断是否需要显示端口
+      const shouldShowPort = port && 
+                            !((protocol === 'http' && port === '80') || 
+                              (protocol === 'https' && port === '443'))
+      
+      const hostWithPort = shouldShowPort ? `${hostname}:${port}` : hostname
+      
+      return `${protocol}://${hostWithPort}`
     }
   }
   
@@ -43,11 +69,27 @@ export function generateShortUrl(path: string, request?: Request): string {
   // 2. 其次从请求头获取 host
   if (request) {
     const host = request.headers.get('host')
-    const protocol = request.headers.get('x-forwarded-proto') || 
-                    (request.headers.get('x-forwarded-ssl') === 'on' ? 'https' : 'http')
+    let protocol = request.headers.get('x-forwarded-proto') || 
+                   (request.headers.get('x-forwarded-ssl') === 'on' ? 'https' : 'http')
+    
+    // 如果设置了强制 HTTPS 环境变量，则使用 HTTPS
+    if (process.env.NEXT_PUBLIC_FORCE_HTTPS === 'true') {
+      protocol = 'https'
+    }
     
     if (host) {
-      return `${protocol}://${host}/${path}`
+      // 解析 host 和 port
+      const [hostname, port] = host.split(':')
+      
+      // 判断是否需要显示端口
+      // HTTP 默认端口 80，HTTPS 默认端口 443，这两种情况不显示端口
+      const shouldShowPort = port && 
+                            !((protocol === 'http' && port === '80') || 
+                              (protocol === 'https' && port === '443'))
+      
+      const hostWithPort = shouldShowPort ? `${hostname}:${port}` : hostname
+      
+      return `${protocol}://${hostWithPort}/${path}`
     }
   }
   
@@ -64,14 +106,34 @@ export function getHostname(request?: Request): string {
   
   // 在客户端，从当前窗口获取
   if (typeof window !== 'undefined') {
-    return window.location.host
+    const hostname = window.location.hostname
+    const port = window.location.port
+    const protocol = window.location.protocol
+    
+    // 判断是否需要显示端口
+    const shouldShowPort = port && 
+                          !((protocol === 'http:' && port === '80') || 
+                            (protocol === 'https:' && port === '443'))
+    
+    return shouldShowPort ? `${hostname}:${port}` : hostname
   }
   
   // 服务端：尝试从请求头获取
   if (request) {
     const host = request.headers.get('host')
     if (host) {
-      return host
+      const protocol = request.headers.get('x-forwarded-proto') || 
+                      (request.headers.get('x-forwarded-ssl') === 'on' ? 'https' : 'http')
+      
+      // 解析 host 和 port
+      const [hostname, port] = host.split(':')
+      
+      // 判断是否需要显示端口
+      const shouldShowPort = port && 
+                            !((protocol === 'http' && port === '80') || 
+                              (protocol === 'https' && port === '443'))
+      
+      return shouldShowPort ? `${hostname}:${port}` : hostname
     }
   }
   
@@ -85,9 +147,60 @@ export function getHostname(request?: Request): string {
   return `localhost:${port}`
 }
 
+// 获取NanoID长度设置
+export async function getNanoidLength(): Promise<number> {
+  try {
+    const { prisma } = await import('@/lib/db')
+    const setting = await prisma.setting.findUnique({
+      where: { key: 'nanoid_length' }
+    })
+    return parseInt(setting?.value || '6')
+  } catch (error) {
+    console.error('获取NanoID长度设置失败:', error)
+    return 6 // 默认长度
+  }
+}
+
 // 生成短链路径
 export function generateShortPath(length: number = 6): string {
   return nanoid(length)
+}
+
+// 生成短链路径（使用设置中的长度）
+export async function generateShortPathWithSettings(): Promise<string> {
+  const length = await getNanoidLength()
+  return generateShortPath(length)
+}
+
+// 截断URL显示，保留前面部分和后面的路径
+export function truncateUrl(url: string, maxPathLength: number = 9, hasPassword: boolean = false): string {
+  try {
+    const urlObj = new URL(url)
+    const path = urlObj.pathname.slice(1) // 移除开头的 /
+    
+    // 只有当路径长度超过maxPathLength时才截断
+    if (path.length <= maxPathLength) {
+      return url
+    }
+    
+    // 如果有密码保护，需要为省略符号预留空间，确保总长度不超过maxPathLength
+    const effectiveMaxLength = hasPassword ? Math.max(1, maxPathLength - 3) : maxPathLength - 3 // 为 "..." 预留3个字符
+    
+    // 截断路径，显示前面部分 + ...
+    const truncatedPath = path.slice(0, effectiveMaxLength) + '...'
+    return `${urlObj.protocol}//${urlObj.host}/${truncatedPath}`
+  } catch (error) {
+    // 如果不是有效URL，只有超过maxPathLength + 20时才截断
+    const totalMaxLength = maxPathLength + 20 // 20是大概的协议和域名长度
+    
+    if (url.length <= totalMaxLength) {
+      return url
+    }
+    
+    // 截断时考虑密码保护
+    const effectiveMaxLength = hasPassword ? Math.max(1, maxPathLength - 3) : maxPathLength - 3
+    return url.slice(0, effectiveMaxLength + 20) + '...'
+  }
 }
 
 // 验证UUID格式
@@ -295,6 +408,22 @@ export function preloadTargetUrl(targetUrl: string): void {
   } catch (error) {
     console.warn('预加载失败:', error)
   }
+}
+
+// 截断域名显示
+export function truncateDomain(domain: string, maxLength: number = 20): string {
+  if (!domain) return ''
+  
+  // 如果域名长度小于等于最大长度，直接返回
+  if (domain.length <= maxLength) {
+    return domain
+  }
+  
+  // 如果域名太长，从中间截断并添加省略号
+  const start = Math.floor((maxLength - 3) / 2)
+  const end = domain.length - (maxLength - 3 - start)
+  
+  return `${domain.substring(0, start)}...${domain.substring(end)}`
 }
 
 // 检查域名是否被允许访问（服务端使用）

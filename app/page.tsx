@@ -37,7 +37,8 @@ function HomeContent() {
     waitTime: 3,
     captchaEnabled: false,
     preloadEnabled: true, // 默认启用预加载
-    autoFillPasswordEnabled: true // 默认启用密码自动填充
+    autoFillPasswordEnabled: true, // 默认启用密码自动填充
+    nanoidLength: 6 // 默认 NanoID 长度
   })
   
   // 通知对话框 hook
@@ -77,7 +78,8 @@ function HomeContent() {
             waitTime: data.waitTime || 3,
             captchaEnabled: data.captchaEnabled || false,
             preloadEnabled: data.preloadEnabled !== false, // 默认启用
-            autoFillPasswordEnabled: data.autoFillPasswordEnabled !== false // 默认启用
+            autoFillPasswordEnabled: data.autoFillPasswordEnabled !== false, // 默认启用
+            nanoidLength: data.nanoidLength || 6 // 默认 NanoID 长度
           })
         }
       } catch (error) {

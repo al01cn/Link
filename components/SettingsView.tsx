@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Settings, Shield, Clock, X, Check, Plus, Trash2, Zap, Download, Upload, FileText } from 'lucide-react'
+import { Settings, Shield, Clock, X, Check, Plus, Trash2, Zap, Download, Upload, FileText, Hash } from 'lucide-react'
 import { TranslationKey } from '@/lib/translations'
 import { useConfirmDialog, useNotificationDialog } from '@/lib/useDialog'
 import { useGlobalMessage } from '@/lib/useGlobalMessage'
@@ -14,6 +14,7 @@ interface SettingsData {
   captchaEnabled: boolean
   preloadEnabled: boolean
   autoFillPasswordEnabled: boolean
+  nanoidLength: number
 }
 
 interface DomainRule {
@@ -125,7 +126,8 @@ export default function SettingsView({ isOpen, onClose, settings, setSettings, t
           waitTime: data.waitTime,
           captchaEnabled: data.captchaEnabled || false,
           preloadEnabled: data.preloadEnabled !== false, // 默认启用
-          autoFillPasswordEnabled: data.autoFillPasswordEnabled !== false // 默认启用
+          autoFillPasswordEnabled: data.autoFillPasswordEnabled !== false, // 默认启用
+          nanoidLength: data.nanoidLength || 6 // 默认6个字符
         })
         setDomainRules(data.domainRules)
       } else if (response.status === 401) {
@@ -175,7 +177,8 @@ export default function SettingsView({ isOpen, onClose, settings, setSettings, t
             waitTime: newSettings.waitTime,
             captchaEnabled: newSettings.captchaEnabled,
             preloadEnabled: newSettings.preloadEnabled,
-            autoFillPasswordEnabled: newSettings.autoFillPasswordEnabled
+            autoFillPasswordEnabled: newSettings.autoFillPasswordEnabled,
+            nanoidLength: newSettings.nanoidLength
           })
         })
         
@@ -739,6 +742,56 @@ export default function SettingsView({ isOpen, onClose, settings, setSettings, t
                   <span className="font-bold text-slate-700 dark:text-slate-200">{t('disableAutoFillPassword')}</span>
                 </div>
                 <p className="text-xs text-slate-500 pl-8">{t('autoFillPasswordOffDesc')}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* NanoID长度设置 */}
+          <div className={isClient ? 'animate__animated animate__fadeIn' : ''}>
+            <h3 className={`text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+              <Hash size={16} />
+              {t('nanoidLengthSettings')}
+            </h3>
+            <div className="bg-slate-50 rounded-xl p-6 border border-slate-100">
+              <p className="text-sm text-slate-500 mb-4">{t('nanoidLengthDesc')}</p>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="flex-1 w-full sm:w-auto">
+                  <input
+                    type="range"
+                    min="5"
+                    max="20"
+                    value={settings.nanoidLength || 6}
+                    onChange={(e) => {
+                      const newSettings = {...settings, nanoidLength: parseInt(e.target.value)}
+                      saveSettings(newSettings)
+                    }}
+                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[var(--color-primary)]"
+                    style={{
+                      background: `linear-gradient(to right, var(--color-primary) 0%, var(--color-primary) ${(((settings.nanoidLength || 6) - 5) / 15) * 100}%, rgb(226 232 240) ${(((settings.nanoidLength || 6) - 5) / 15) * 100}%, rgb(226 232 240) 100%)`
+                    }}
+                  />
+                  <div className="flex justify-between text-xs text-slate-400 mt-2">
+                    <span>5</span>
+                    <span>10</span>
+                    <span>15</span>
+                    <span>20</span>
+                  </div>
+                </div>
+                <div className="cute-input-wrapper bg-white rounded-lg px-4 py-2 flex items-center gap-2 min-w-[140px] flex-shrink-0">
+                  <input
+                    type="number"
+                    min="5"
+                    max="20"
+                    className="w-full bg-transparent outline-none text-slate-800 font-bold text-center"
+                    value={settings.nanoidLength || 6}
+                    onChange={(e) => {
+                      const value = Math.max(5, Math.min(20, parseInt(e.target.value) || 5))
+                      const newSettings = {...settings, nanoidLength: value}
+                      saveSettings(newSettings)
+                    }}
+                  />
+                  <span className={`text-sm font-medium whitespace-nowrap ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{t('characters')}</span>
+                </div>
               </div>
             </div>
           </div>

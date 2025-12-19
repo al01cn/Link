@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node scripts/setup-schema.js && npx prisma generate && next dev",
     "build": "node scripts/setup-schema.js && npx prisma generate && next build",
-    "build:vercel": "node scripts/setup-schema.js && npx prisma generate && npx prisma db push && bun run db:init && next build",
+    "build:vercel": "node scripts/setup-schema.js && npx prisma generate && npx prisma db push && tsx scripts/init-db-vercel.ts && next build",
     "build:prod": "tsx scripts/build-production.ts",
     "package:prod": "tsx scripts/create-deployment-package.ts full",
     "package:update": "tsx scripts/create-deployment-package.ts update",

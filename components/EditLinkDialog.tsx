@@ -5,6 +5,7 @@ import { Link2, Lock, Shield, Zap, X, ExternalLink, Calendar, Save, AlertCircle 
 import { useConfirmDialog } from '@/lib/useDialog'
 import { useLanguage } from '@/lib/LanguageContext'
 import { useHostname } from '@/lib/useHostname'
+import { truncateDomain } from '@/lib/utils'
 import ConfirmDialog from './ConfirmDialog'
 
 interface ShortLink {
@@ -111,10 +112,8 @@ export default function EditLinkDialog({
     if (customPath.trim()) {
       if (!/^[a-zA-Z0-9_-]+$/.test(customPath)) {
         newErrors.customPath = t('pathOnlyLettersNumbers')
-      } else if (customPath.length < 3) {
+      } else if (customPath.length < 1) {
         newErrors.customPath = t('pathMinLength')
-      } else if (customPath.length > 50) {
-        newErrors.customPath = t('pathMaxLength')
       }
     }
 
@@ -287,14 +286,15 @@ export default function EditLinkDialog({
             {/* 自定义路径 */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                {t('customPathOptional')}
+                {hostname && (
+                  <span className="text-slate-400 text-sm" title={hostname}>
+                    {truncateDomain(hostname, 25)}/
+                  </span>
+                )}
               </label>
               <div className={`cute-input-wrapper bg-white rounded-lg px-4 py-3 flex items-center gap-2 ${
                 errors.customPath ? 'border-red-300 ring-1 ring-red-300' : ''
               }`}>
-                <span className="text-slate-400 text-sm">
-                  {hostname}/
-                </span>
                 <input 
                   type="text" 
                   placeholder={t('customPathPlaceholder')}

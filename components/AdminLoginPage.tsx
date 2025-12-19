@@ -51,7 +51,7 @@ export default function AdminLoginPage() {
 
       if (response.ok) {
         // 传递默认账号标识给login函数
-        login(data.token, data.username, data.isDefault)
+        await login(data.token, data.username, data.isDefault)
       } else {
         setError(data.error || t('loginFailed'))
       }

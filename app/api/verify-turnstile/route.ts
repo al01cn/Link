@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     console.error(t('turnstileVerificationError') + ':', error)
     return NextResponse.json({ 
       success: false, 
-      error: t('captchaServiceError') 
+      error: t('turnstileVerificationError') 
     }, { status: 500 })
   }
 }

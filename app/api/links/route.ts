@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { generateShortPath, isValidUrl, fetchPageTitle, extractDomain, checkDomainAccessServer, getBaseUrl, generateShortUrl } from '@/lib/utils'
+import { generateShortPath, generateShortPathWithSettings, isValidUrl, fetchPageTitle, extractDomain, checkDomainAccessServer, getBaseUrl, generateShortUrl } from '@/lib/utils'
 import { encryptPassword } from '@/lib/crypto'
 import Logger from '@/lib/logger'
 import { translateForRequest } from '@/lib/translations'
@@ -37,11 +37,8 @@ export async function POST(request: NextRequest) {
       if (!/^[a-zA-Z0-9_-]+$/.test(customPath)) {
         return NextResponse.json({ error: translateForRequest(request, 'pathOnlyLettersNumbers') }, { status: 400 })
       }
-      if (customPath.length < 3) {
+      if (customPath.length < 1) {
         return NextResponse.json({ error: translateForRequest(request, 'pathMinLength') }, { status: 400 })
-      }
-      if (customPath.length > 50) {
-        return NextResponse.json({ error: translateForRequest(request, 'pathMaxLength') }, { status: 400 })
       }
     }
 
@@ -85,7 +82,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 生成或使用自定义路径
-    let path = customPath || generateShortPath()
+    let path = customPath || await generateShortPathWithSettings()
     
     // 检查路径是否已存在
     const existing = await prisma.shortLink.findUnique({
@@ -97,7 +94,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: translateForRequest(request, 'linkExists') }, { status: 400 })
       }
       // 如果是随机生成的路径冲突，重新生成
-      path = generateShortPath()
+      path = await generateShortPathWithSettings()
     }
 
     // 使用用户提供的标题，如果没有则尝试自动获取页面标题

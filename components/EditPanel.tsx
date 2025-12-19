@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Lock, Shield, Zap, ExternalLink, Calendar, Save, AlertCircle } from 'lucide-react'
 import { useLanguage } from '@/lib/LanguageContext'
 import { useHostname } from '@/lib/useHostname'
+import { truncateDomain } from '@/lib/utils'
 
 interface ShortLink {
   id: string
@@ -112,10 +113,8 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
     if (customPath.trim()) {
       if (!/^[a-zA-Z0-9_-]+$/.test(customPath)) {
         newErrors.customPath = t('pathOnlyLettersNumbers')
-      } else if (customPath.length < 3) {
+      } else if (customPath.length < 1) {
         newErrors.customPath = t('pathMinLength')
-      } else if (customPath.length > 50) {
-        newErrors.customPath = t('pathMaxLength')
       }
     }
 
@@ -286,14 +285,15 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
               {/* 自定义路径 */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  {t('customPath')}
+                  {hostname && (
+                    <span className="text-slate-400 dark:text-slate-500 text-sm" title={hostname}>
+                      {truncateDomain(hostname, 25)}/
+                    </span>
+                  )}
                 </label>
                 <div className={`cute-input-wrapper bg-white dark:bg-slate-800 rounded-lg px-4 py-3 flex items-center gap-2 ${
                   errors.customPath ? 'border-red-300 dark:border-red-400' : ''
                 }`}>
-                  <span className="text-slate-400 dark:text-slate-500 text-sm">
-                    {hostname}/
-                  </span>
                   <input 
                     type="text" 
                     placeholder={t('customPathPlaceholder')}
@@ -463,6 +463,48 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
 
             </div>
 
+            {/* 重置按钮 - 仅在数据库中已设置密码时显示 */}
+            {link.hasPassword && (
+              <div className="pt-2">
+                <button
+                  onClick={async () => {
+                    setIsLoading(true)
+                    try {
+                      // 直接保存重置后的状态到数据库
+                      await onSave(link.id, {
+                        originalUrl,
+                        title: title.trim() || undefined,
+                        description: description.trim() || undefined,
+                        customPath: customPath || undefined,
+                        password: '', // 清空密码
+                        expiresAt: expiresAt || undefined,
+                        requireConfirm: false, // 关闭二次确认
+                        enableIntermediate: true // 启用自动跳转
+                      })
+                      // 重置成功后更新前端状态
+                      setPassword('')
+                      setRequireConfirm(false)
+                      setEnableIntermediate(true)
+                    } catch (error) {
+                      console.error('重置失败:', error)
+                    } finally {
+                      setIsLoading(false)
+                    }
+                  }}
+                  disabled={isLoading}
+                  className="w-full px-4 py-2 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  {t('resetPasswordMode')}
+                </button>
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 text-center">
+                  {t('resetPasswordModeDesc')}
+                </p>
+              </div>
+            )}
+
             {/* 操作按钮 */}
             <div className="flex gap-3 pt-2">
               <button 
@@ -470,7 +512,7 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
                 disabled={isLoading}
                 className="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg font-medium transition-colors disabled:opacity-50"
               >
-                取消
+                {t('cancel')}
               </button>
               <button 
                 onClick={handleSave}
@@ -480,12 +522,12 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
                 {isLoading ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    保存中...
+                    {t('saving')}
                   </>
                 ) : (
                   <>
                     <Save size={16} />
-                    保存更改
+                    {t('saveChanges')}
                   </>
                 )}
               </button>
