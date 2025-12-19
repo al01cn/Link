@@ -75,7 +75,7 @@ bun run build && bun run start
 
 点击下面按钮即可一键部署到 Vercel：
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/al01cn/Link&env=DATABASE_PROVIDER,DATABASE_URL,NEXT_PUBLIC_BASE_URL,ENCRYPTION_KEY&envDescription=数据库配置和应用密钥&envLink=https://github.com/al01cn/Link/blob/main/.env.example)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/al01cn/Link&env=DATABASE_PROVIDER,DATABASE_URL,ENCRYPTION_KEY&envDescription=数据库配置和应用密钥&envLink=https://gh.llkk.cc/https://github.com/al01cn/Link/blob/main/.env.example)
 
 ### Netlify 部署
 
@@ -86,7 +86,6 @@ bun run build && bun run start
 **部署时需要配置的环境变量：**
 - `DATABASE_PROVIDER` - 数据库类型（postgresql 或 mysql）
 - `DATABASE_URL` - 数据库连接字符串
-- `NEXT_PUBLIC_BASE_URL` - 应用访问地址
 - `ENCRYPTION_KEY` - 密码加密密钥
 
 > 💡 **提示**：推荐使用 [Supabase](https://supabase.com) 或 [Neon](https://neon.tech) 的免费 PostgreSQL 数据库。系统会根据 `DATABASE_PROVIDER` 自动选择正确的数据库 schema。

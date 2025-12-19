@@ -73,8 +73,7 @@ Visit [http://localhost:3000](http://localhost:3000) to get started!
 
 ### Vercel Deployment
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fal01cn%2FLink)
-
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/al01cn/Link&env=DATABASE_PROVIDER,DATABASE_URL,ENCRYPTION_KEY&envDescription=Database%20configuration%20and%20application%20key&envLink=https://github.com/al01cn/Link/blob/main/.env.example)
 ### Netlify Deployment
 
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/al01cn/Link)
