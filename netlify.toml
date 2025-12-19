@@ -11,7 +11,7 @@
 [template.environment]
   DATABASE_PROVIDER = "数据库类型：postgresql 或 mysql"
   DATABASE_URL = "PostgreSQL / MySQL 连接字符串"
-  NEXT_PUBLIC_BASE_URL = "应用访问地址，例如：https://xxx.netlify.app"
+  NEXT_PUBLIC_BASE_URL = "应用访问地址，例如：https://xxx.netlify.app（可选）"
   ENCRYPTION_KEY = "密码加密密钥，请使用强随机字符串"
   NEXT_PUBLIC_TURNSTILE_SITE_KEY = "Cloudflare Turnstile 站点密钥（可选）"
   TURNSTILE_SECRET_KEY = "Cloudflare Turnstile 私钥（可选）"
