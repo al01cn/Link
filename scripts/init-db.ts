@@ -145,14 +145,14 @@ async function fullReset() {
   console.log('   3. 配置人机验证（可选）')
 }
 
-// 升级模式 - 仅更新缺失的设置
+// 升级模式 - 仅更新缺失的设置，绝不覆盖现有管理员账号
 async function upgradeMode() {
   console.log('[升级模式] 检查并更新系统设置...')
   
   // 检查是否有管理员账号
   const adminCount = await prisma.admin.count()
   if (adminCount === 0) {
-    console.log('[创建] 创建默认管理员账号...')
+    console.log('[创建] 数据库中没有管理员账号，创建默认管理员账号...')
     const defaultPassword = 'Loooong123'
     const hashedPassword = await bcrypt.hash(defaultPassword, 10)
     
@@ -166,8 +166,10 @@ async function upgradeMode() {
     console.log('  ✓ 默认管理员账号已创建')
     console.log('  ✓ 用户名: Loooong')
     console.log('  ✓ 密码: Loooong123')
+    console.log('  ⚠️  请首次登录后立即修改密码')
   } else {
-    console.log('  ✓ 管理员账号已存在，跳过创建')
+    console.log('  ✓ 检测到现有管理员账号，保持不变（不会覆盖或重置）')
+    console.log('  ℹ️  如需重置管理员账号，请选择"全新安装"模式')
   }
 
   await createDefaultSettings()

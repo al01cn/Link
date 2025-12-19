@@ -72,14 +72,14 @@ async function fullInitialization() {
   console.log('   ⚠️  首次登录后请立即修改密码')
 }
 
-// 升级模式 - 保留所有现有数据，仅补充缺失设置
+// 升级模式 - 保留所有现有数据，绝不覆盖现有管理员账号
 async function upgradeMode() {
   console.log('[升级模式] 检查并补充缺失的设置...')
   
   // 检查是否有管理员账号
   const adminCount = await prisma.admin.count()
   if (adminCount === 0) {
-    console.log('[创建] 创建默认管理员账号...')
+    console.log('[创建] 数据库中没有管理员账号，创建默认管理员账号...')
     const defaultPassword = 'Loooong123'
     const hashedPassword = await bcrypt.hash(defaultPassword, 10)
     
@@ -93,8 +93,10 @@ async function upgradeMode() {
     console.log('  ✓ 默认管理员账号已创建')
     console.log('  ✓ 用户名: Loooong')
     console.log('  ✓ 密码: Loooong123')
+    console.log('  ⚠️  请首次登录后立即修改密码')
   } else {
-    console.log('  ✓ 管理员账号已存在，跳过创建')
+    console.log('  ✓ 检测到现有管理员账号，保持不变（不会覆盖或重置）')
+    console.log('  ℹ️  管理员账号和密码保持原有设置')
   }
 
   await createDefaultSettings()
