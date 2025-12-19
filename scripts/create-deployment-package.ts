@@ -54,8 +54,8 @@ try {
       'dev.db-journal',   // SQLite 日志文件
       'dev.db-wal',       // SQLite WAL 文件
       'data',             // 数据目录
-      '.env',             // 环境配置文件（避免覆盖生产配置）
-      'prisma/migrations' // 数据库迁移文件（避免数据冲突）
+      '.env'              // 环境配置文件（避免覆盖生产配置）
+      // 注意：更新包现在也包含 migrations，确保数据库架构同步
     ])
     
     // 从临时目录创建压缩包
@@ -97,13 +97,14 @@ try {
     console.log('4. 解压到应用目录: tar -xzf ' + packageName)
     console.log('5. 安装/更新依赖: bun install --production')
     console.log('6. 重新生成 Prisma 客户端: bunx prisma generate')
-    console.log('7. 重启服务: pm2 restart link-app')
+    console.log('7. 运行数据库迁移: bunx prisma migrate deploy')
+    console.log('8. 重启服务: pm2 restart link-app')
     
     console.log('\n⚠️  更新包注意事项:')
     console.log('- 不包含数据库文件，现有数据不会被覆盖')
     console.log('- 不包含 .env 文件，现有配置不会被覆盖')
-    console.log('- 不包含 prisma/migrations，避免数据库结构冲突')
-    console.log('- 建议在更新前备份整个应用目录')
+    console.log('- 包含 prisma/migrations，确保数据库架构同步')
+    console.log('- 建议在更新前备份整个应用目录和数据库')
     
   } else {
     console.log('\n🚀 完整包部署说明:')
@@ -162,18 +163,18 @@ function copyDirectoryExcluding(src: string, dest: string, excludeList: string[]
 }
 
 /**
- * 复制 Prisma 目录，排除 migrations 文件夹和数据库文件
+ * 复制 Prisma 目录，排除数据库文件但保留 migrations
  */
 function copyPrismaDirectory(src: string, dest: string) {
   fs.mkdirSync(dest, { recursive: true })
   
   const entries = fs.readdirSync(src, { withFileTypes: true })
   
-  // 需要排除的文件和目录
-  const excludeItems = ['migrations', 'dev.db', 'dev.db-journal', 'dev.db-wal']
+  // 只排除数据库文件，保留 migrations 目录
+  const excludeItems = ['dev.db', 'dev.db-journal', 'dev.db-wal']
   
   for (const entry of entries) {
-    // 跳过 migrations 目录和数据库文件
+    // 只跳过数据库文件，保留 migrations 目录
     if (excludeItems.includes(entry.name)) {
       console.log(`  ⏭️  跳过: prisma/${entry.name}`)
       continue

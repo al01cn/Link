@@ -118,11 +118,11 @@ fs.copyFileSync(
   path.join(distDir, 'package.json')
 )
 
-// 复制 prisma 目录（排除 migrations）
+// 复制 prisma 目录（包含 migrations 和初始化的数据库）
 const prismaDir = path.join(rootDir, 'prisma')
 if (fs.existsSync(prismaDir)) {
-  console.log('  - 复制 prisma 目录（排除 migrations）...')
-  copyPrismaDirectory(prismaDir, path.join(distDir, 'prisma'))
+  console.log('  - 复制 prisma 目录（包含 migrations 和数据库）...')
+  copyPrismaDirectoryWithDb(prismaDir, path.join(distDir, 'prisma'))
 }
 
 // 复制 next.config.ts
@@ -186,11 +186,9 @@ bun install --production
 cp .env.example .env
 \`\`\`
 
-### 3. 初始化数据库
+### 3. 生成 Prisma 客户端
 \`\`\`bash
 bunx prisma generate
-bunx prisma db push
-bun run db:init
 \`\`\`
 
 ### 4. 启动服务
@@ -204,6 +202,11 @@ bun start.js
 # 或使用 PM2
 pm2 start start.js --name link-app
 \`\`\`
+
+## 重要说明
+- **完整包已包含初始化的数据库**，无需重新初始化
+- 默认管理员账号：用户名 \`Loooong\`，密码 \`Loooong123\`
+- 首次登录后请立即修改密码
 
 ## 环境要求
 - Node.js 18+ 或 Bun 1.0+
@@ -294,16 +297,17 @@ fs.writeFileSync(
 console.log('✓ 部署信息已生成\n')
 
 // 7. 清理根目录的数据库文件（避免被意外打包）
+// 注意：不清理 prisma 目录中的数据库文件，因为完整包需要包含初始化的数据库
 console.log('🧹 清理根目录数据库文件...')
 const dbFiles = ['dev.db', 'dev.db-journal', 'dev.db-wal']
 dbFiles.forEach(file => {
   const dbPath = path.join(rootDir, file)
   if (fs.existsSync(dbPath)) {
     fs.unlinkSync(dbPath)
-    console.log(`  ✓ 清理 ${file}`)
+    console.log(`  ✓ 清理根目录 ${file}`)
   }
 })
-console.log('✓ 根目录数据库文件已清理\n')
+console.log('✓ 根目录数据库文件已清理（保留 prisma 目录中的数据库）\n')
 
 // 8. 自动创建部署包
 console.log('📦 自动创建部署包...\n')
@@ -362,8 +366,9 @@ console.log('   1. 将完整包上传到服务器')
 console.log('   2. 解压: tar -xzf link-app-production-*.tar.gz')
 console.log('   3. 安装依赖: bun install --production')
 console.log('   4. 配置环境: cp .env.example .env && 编辑 .env')
-console.log('   5. 初始化数据库: bunx prisma generate && bunx prisma db push && bun run db:init')
+console.log('   5. 生成 Prisma 客户端: bunx prisma generate')
 console.log('   6. 启动服务: node start.js 或 pm2 start start.js --name link-app')
+console.log('   注意：完整包已包含初始化的数据库，无需重新初始化')
 
 console.log('\n更新包部署（更新现有部署）:')
 console.log('   1. 停止现有服务: pm2 stop link-app')
@@ -413,7 +418,32 @@ function copyDirectory(src: string, dest: string) {
   }
 }
 
-// 辅助函数：复制 Prisma 目录，排除 migrations 和数据库文件
+// 辅助函数：复制 Prisma 目录，包含 migrations 和数据库文件（用于完整包）
+function copyPrismaDirectoryWithDb(src: string, dest: string) {
+  if (!fs.existsSync(src)) {
+    console.warn(`⚠️  源目录不存在: ${src}`)
+    return
+  }
+
+  fs.mkdirSync(dest, { recursive: true })
+  
+  const entries = fs.readdirSync(src, { withFileTypes: true })
+  
+  // 完整包包含所有文件，包括数据库文件
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name)
+    const destPath = path.join(dest, entry.name)
+    
+    if (entry.isDirectory()) {
+      copyDirectory(srcPath, destPath)
+    } else {
+      fs.copyFileSync(srcPath, destPath)
+      console.log(`    ✓ 复制: prisma/${entry.name}`)
+    }
+  }
+}
+
+// 辅助函数：复制 Prisma 目录，排除数据库文件但保留 migrations（用于更新包）
 function copyPrismaDirectory(src: string, dest: string) {
   if (!fs.existsSync(src)) {
     console.warn(`⚠️  源目录不存在: ${src}`)
@@ -424,11 +454,11 @@ function copyPrismaDirectory(src: string, dest: string) {
   
   const entries = fs.readdirSync(src, { withFileTypes: true })
   
-  // 需要排除的文件和目录
-  const excludeItems = ['migrations', 'dev.db', 'dev.db-journal', 'dev.db-wal']
+  // 只排除数据库文件，保留 migrations 目录
+  const excludeItems = ['dev.db', 'dev.db-journal', 'dev.db-wal']
   
   for (const entry of entries) {
-    // 跳过 migrations 目录和数据库文件
+    // 只跳过数据库文件，保留 migrations 目录
     if (excludeItems.includes(entry.name)) {
       console.log(`    ⏭️  跳过: prisma/${entry.name}`)
       continue

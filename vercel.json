@@ -1,0 +1,14 @@
+{
+  "buildCommand": "bun run build:vercel",
+  "devCommand": "bun run dev",
+  "installCommand": "bun install",
+  "framework": "nextjs",
+  "functions": {
+    "app/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  },
+  "env": {
+    "DATABASE_PROVIDER": "postgresql"
+  }
+}
