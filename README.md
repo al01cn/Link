@@ -104,6 +104,32 @@ bun run build && bun run start
 
 > ⚠️ **重要提醒**：在无状态 Serverless 托管平台（如 Vercel、Netlify、Railway 等）部署时，**必须将 SQLite 数据库更换为其他数据库**，因为 Serverless 环境不支持持久化文件存储。
 
+```bash
+# Serverless 通用
+bun run build:sls
+
+# 启动
+bun run start
+```
+
+### 服务器部署
+
+```bash
+# 构建出生产包
+bun run build:prod
+
+# 在build目录下找到压缩包，上传到服务器
+
+# 安装依赖
+pnpm install --production
+
+# 或者
+bun install --production
+
+# 启动
+bun run start
+```
+
 #### 推荐的数据库选择
 
 **1. PostgreSQL（推荐）**

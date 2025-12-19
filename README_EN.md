@@ -1,18 +1,18 @@
-# AL01Link - Enterprise URL Shortener
+# AL01 Link - A Simple and Powerful URL Shortener
 
-English | [中文](./README.md)
+[中文](./README.md) | English
 
-🔗 **Simple, Secure, Powerful URL Shortening Tool**
+🔗 **Simple, Secure, and Powerful URL Shortening Service**
 
-A modern URL shortening service built with Next.js 16 + Prisma + SQLite, featuring password protection, domain management, access analytics, and other enterprise-grade capabilities.
+AL01 Link is a modern URL shortener built with Next.js 16, Prisma, and SQLite. It supports password protection, domain management, access analytics, and more.
 
-## ✨ Core Features
+## ✨ Key Features
 
-- 🔗 **Smart Link Generation** - Auto-generate or custom paths, batch management support
-- 🛡️ **Enterprise Security** - Password protection, domain whitelist, confirmation mechanism
-- ⚡ **Multiple Redirect Modes** - Direct redirect, transition page, manual confirmation, quick jump
-- 📊 **Data Analytics** - Access statistics, logs, trend analysis
-- 🎨 **Modern Interface** - Responsive design, bilingual support, dark theme
+- 🔗 **Smart Short Link Generation** - Auto-generate or customize paths with batch management support
+- 🛡️ **Security Protection** - Password protection, domain whitelist, and secondary confirmation
+- ⚡ **Multiple Redirect Modes** - Direct redirect, intermediate page, manual confirmation, temporary redirect
+- 📊 **Analytics & Insights** - Access statistics, logs, and trend analysis
+- 🎨 **Modern UI** - Responsive design, bilingual (EN/ZH), and dark mode
 
 ## 🚀 Quick Start
 
@@ -20,39 +20,39 @@ A modern URL shortening service built with Next.js 16 + Prisma + SQLite, featuri
 - Node.js 18.0+
 - Bun 1.0+ (recommended) or npm/yarn
 
-### Installation & Deployment
+### Installation & Setup
 
-**1. Clone Project**
+**1. Clone the repository**
 ```bash
-# GitHub (International)
+# GitHub (Global)
 git clone https://github.com/al01cn/Link.git
 
-# Gitee (China Mirror)
+# Gitee (China)
 git clone https://gitee.com/al01/Link.git
 
-# GitCode (China Mirror)
+# GitCode (China)
 git clone https://gitcode.com/al01cn/Link.git
 
 cd Link
 ```
 
-**2. Install Dependencies**
+**2. Install dependencies**
 ```bash
 bun install
 ```
 
-**3. Environment Configuration**
+**3. Environment configuration**
 ```bash
 cp .env.example .env.local
-# Edit .env.local to configure database and app URL
+# Edit .env.local to configure the database and application URL
 ```
 
-**4. Initialize Database**
+**4. Initialize the database**
 ```bash
 bun run setup
 ```
 
-**5. Start Service**
+**5. Start the service**
 ```bash
 # Development mode
 bun run dev
@@ -61,22 +61,116 @@ bun run dev
 bun run build && bun run start
 ```
 
-Visit [http://localhost:3000](http://localhost:3000) to get started!
+Visit [http://localhost:3000](http://localhost:3000) to get started.
 
 ### Default Admin Account
 - **Username**: `Loooong`
 - **Password**: `Loooong123`
 
-> ⚠️ System will force password change on first login
+> ⚠️ You will be required to change the default password after your first login.
+
+## 🚀 One-Click Deployment
+
+### Deploy to Vercel
+
+Click the button below to deploy AL01 Link to Vercel with one click:
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/al01cn/Link&env=DATABASE_PROVIDER,DATABASE_URL,ENCRYPTION_KEY&envDescription=Database configuration and application secrets&envLink=https://gh.llkk.cc/https://github.com/al01cn/Link/blob/main/.env.example)
+
+**Required environment variables:**
+- `DATABASE_PROVIDER` - Database type (`postgresql` or `mysql`)
+- `DATABASE_URL` - Database connection string
+- `ENCRYPTION_KEY` - Encryption key for passwords
+
+> 💡 **Tip**: We recommend using free PostgreSQL databases from **Supabase** or **Neon**. The system automatically selects the correct Prisma schema based on `DATABASE_PROVIDER`.
+
+### Deploy to Netlify
+
+Click the button below to deploy with Netlify. You will be prompted to configure the required environment variables automatically:
+
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/al01cn/Link)
+
+**Required environment variables:**
+- `DATABASE_PROVIDER` - Database type (`postgresql` or `mysql`)
+- `DATABASE_URL` - Database connection string
+- `NEXT_PUBLIC_BASE_URL` - Application base URL (optional; auto-detected if empty)
+- `ENCRYPTION_KEY` - Encryption key
+
+> 💡 **Tip**: Netlify will automatically prompt for required environment variables based on `netlify.toml`.
 
 ## 🚀 Deployment Guide
 
-### Vercel Deployment
+### Serverless Platforms
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/al01cn/Link&env=DATABASE_PROVIDER,DATABASE_URL,ENCRYPTION_KEY&envDescription=Database%20configuration%20and%20application%20key&envLink=https://github.com/al01cn/Link/blob/main/.env.example)
-### Netlify Deployment
+> ⚠️ **Important**: When deploying to stateless Serverless platforms (such as Vercel, Netlify, or Railway), **SQLite must be replaced with another database**, as Serverless environments do not support persistent file storage.
 
-[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/al01cn/Link)
+```bash
+# Build for Serverless
+bun run build:sls
+
+# Start
+bun run start
+```
+
+### Server Deployment
+
+```bash
+# Build production package
+bun run build:prod
+
+# Upload the build artifact to your server
+
+# Install dependencies
+pnpm install --production
+
+# or
+bun install --production
+
+# Start the service
+bun run start
+```
+
+#### Recommended Databases
+
+**1. PostgreSQL (Recommended)**
+```bash
+DATABASE_PROVIDER="postgresql"
+DATABASE_URL="postgresql://username:password@host:5432/database"
+```
+
+**2. MySQL**
+```bash
+DATABASE_PROVIDER="mysql"
+DATABASE_URL="mysql://username:password@host:3306/database"
+```
+
+**3. Cloud Database Services**
+- **Supabase** - Free PostgreSQL hosting
+- **PlanetScale** - Serverless MySQL
+- **Neon** - Modern PostgreSQL platform
+- **Railway** - Cloud platform with multiple database options
+
+#### Database Migration Steps
+
+1. **Update environment variables**
+   ```bash
+   DATABASE_PROVIDER="postgresql"  # or "mysql"
+   DATABASE_URL="postgresql://username:password@host:5432/database"
+   ```
+
+2. **Regenerate Prisma Client**
+   ```bash
+   bun run prisma generate
+   ```
+
+3. **Apply database migrations**
+   ```bash
+   bun run prisma db push
+   ```
+
+> 🎯 **Automation Advantage**: The system automatically selects the correct Prisma schema based on `DATABASE_PROVIDER`, with no manual configuration required.
+
+> 📖 **Detailed Guide**: See [DATABASE_MIGRATION.md](./DATABASE_MIGRATION.md) for full migration instructions and FAQs.
 
 ### Docker Deployment
 
@@ -84,84 +178,85 @@ Visit [http://localhost:3000](http://localhost:3000) to get started!
 # Using Docker Compose
 docker-compose up -d
 
-# Initialize database
+# Initialize the database
 docker-compose exec app bun run setup
 ```
+
+> 📝 **Note**: Docker deployment supports SQLite because containers provide persistent storage.
 
 ### Environment Variables
 
 ```bash
 # Required
-DATABASE_URL="file:./dev.db"                    # Database connection
-NEXT_PUBLIC_BASE_URL="http://localhost:3000"    # App URL
-ENCRYPTION_KEY="your-secret-key"                # Encryption key
+DATABASE_PROVIDER="sqlite"                     # sqlite | postgresql | mysql
+DATABASE_URL="file:./dev.db"                   # SQLite (local development)
+NEXT_PUBLIC_BASE_URL="http://localhost:3000"   # Application URL
+ENCRYPTION_KEY="your-secret-key"               # Encryption key
 
 # Optional
-NEXT_PUBLIC_TURNSTILE_SITE_KEY="your-site-key"  # Cloudflare verification
+NEXT_PUBLIC_TURNSTILE_SITE_KEY="your-site-key" # Cloudflare Turnstile
 TURNSTILE_SECRET_KEY="your-secret-key"
 ```
 
 ## 🛠️ Tech Stack
 
-- **Frontend Framework**: [Next.js 16](https://nextjs.org/) - React full-stack framework
-- **Database**: [Prisma](https://prisma.io/) + SQLite/PostgreSQL - Modern database toolkit
-- **Styling**: [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
-- **Icons**: [Lucide React](https://lucide.dev/) - Beautiful icon library
-- **Runtime**: [Bun](https://bun.sh/) - Fast JavaScript runtime
-- **Language**: TypeScript - Type-safe JavaScript
+- **Framework**: Next.js 16
+- **Database**: Prisma + SQLite / PostgreSQL / MySQL
+- **Styling**: Tailwind CSS
+- **Icons**: Lucide React
+- **Runtime**: Bun
+- **Language**: TypeScript
 
 ## 📖 API Documentation
 
-For detailed API documentation, please see:
-- [中文 API 文档](./API.md)
-- [English API Documentation](./API_EN.md)
+- [Chinese API Docs](./API.md)
+- [English API Docs](./API_EN.md)
 
 ## 🤝 Contributing
 
-Welcome to submit Issues and Pull Requests!
+Issues and Pull Requests are welcome!
 
-- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/al01cn/Link/issues)
-- 💬 **Feature Discussions**: [GitHub Discussions](https://github.com/al01cn/Link/discussions)
-- 🇨🇳 **China Users**: [Gitee](https://gitee.com/al01/Link) | [GitCode](https://gitcode.com/al01cn/Link)
+- 🐛 **Bug Reports**: GitHub Issues
+- 💬 **Discussions**: GitHub Discussions
+- 🇨🇳 **China Mirrors**: Gitee | GitCode
 
-## 🙏 Acknowledgments
+## 🙏 Acknowledgements
 
-Thanks to the following open source projects:
-
-- [Next.js](https://nextjs.org/) - React full-stack framework
-- [Prisma](https://prisma.io/) - Modern database toolkit
-- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
-- [Lucide React](https://lucide.dev/) - Beautiful icon library
-- [Bun](https://bun.sh/) - Fast JavaScript runtime
+- Next.js
+- Prisma
+- Tailwind CSS
+- Lucide React
+- Bun
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
+Licensed under the MIT License.
 
 ---
 
 <div align="center">
 
-### 📦 Open Source Repositories
+### 📦 Repositories
 
 | Platform | Link | Description |
-|----------|------|-------------|
-| **GitHub** | [al01cn/Link](https://github.com/al01cn/Link) | International, Latest Features |
-| **Gitee** | [al01/Link](https://gitee.com/al01/Link) | China Mirror, Faster Access |
-| **GitCode** | [al01cn/Link](https://gitcode.com/al01cn/Link) | China Mirror, Alternative Choice |
+|--------|------|-------------|
+| **GitHub** | al01cn/Link | Global, latest features |
+| **Gitee** | al01/Link | China mirror |
+| **GitCode** | al01cn/Link | China mirror (backup) |
 
-**AL01Link** - Make long URLs short, make sharing simple ✨
-
-[🐛 Issues](https://github.com/al01cn/Link/issues) • [💬 Discussions](https://github.com/al01cn/Link/discussions) • [📖 API Docs](./API_EN.md) • [🇨🇳 中文](./README.md)
+**AL01 Link** — Shorten long URLs, make sharing easier ✨
 
 </div>
+
+---
 
 <div align="center">
 
-### 📦 Sponsor
+### 📦 Sponsorship
 
 [AL01](https://www.al01.cn/#energy)
 
-**Thank you for your support** - Your support is my motivation to develop and maintain AL01 Link!
+**Thank you for your support** — Your support motivates the development and maintenance of AL01 Link.
 
 </div>
+
