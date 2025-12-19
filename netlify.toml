@@ -1,5 +1,5 @@
 [build]
-  command = "bun run build:vercel"
+  command = "bun run build:netlify"
   publish = ".next"
 
 [build.environment]
