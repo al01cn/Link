@@ -11,6 +11,7 @@ interface ShortLink {
   shortUrl: string
   originalUrl: string
   title?: string
+  description?: string
   views: number
   createdAt: string
   expiresAt?: string
@@ -34,6 +35,8 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
   
   // 表单状态
   const [originalUrl, setOriginalUrl] = useState('')
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
   const [customPath, setCustomPath] = useState('')
   const [password, setPassword] = useState('')
   const [requireConfirm, setRequireConfirm] = useState(false)
@@ -48,6 +51,8 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
   useEffect(() => {
     if (link && isExpanded) {
       setOriginalUrl(link.originalUrl)
+      setTitle(link.title || '')
+      setDescription(link.description || '')
       setCustomPath(link.path)
       setPassword('') // 密码不显示，需要用户重新输入
       setRequireConfirm(link.requireConfirm)
@@ -91,6 +96,16 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
       } catch {
         newErrors.originalUrl = t('pleaseEnterValidUrl')
       }
+    }
+
+    // 标题验证
+    if (title.trim() && title.length > 100) {
+      newErrors.title = t('titleLengthError')
+    }
+
+    // 简介验证
+    if (description.trim() && description.length > 200) {
+      newErrors.description = t('descriptionLengthError')
     }
 
     // 自定义路径验证
@@ -150,6 +165,8 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
     try {
       await onSave(link.id, {
         originalUrl,
+        title: title.trim() || undefined,
+        description: description.trim() || undefined,
         customPath: customPath || undefined,
         password: password || undefined,
         expiresAt: expiresAt || undefined,
@@ -201,6 +218,68 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
                   {errors.originalUrl}
                 </p>
               )}
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              {/* 自定义标题 */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  {t('customTitle')}
+                </label>
+                <div className={`cute-input-wrapper bg-white dark:bg-slate-800 rounded-lg px-4 py-3 flex items-center gap-2 ${
+                  errors.title ? 'border-red-300 dark:border-red-400' : ''
+                }`}>
+                  <input 
+                    type="text" 
+                    placeholder={t('customTitlePlaceholder')}
+                    className="w-full bg-transparent outline-none text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500"
+                    value={title}
+                    onChange={(e) => {
+                      setTitle(e.target.value)
+                      if (errors.title) {
+                        setErrors(prev => ({ ...prev, title: '' }))
+                      }
+                    }}
+                    disabled={isLoading}
+                  />
+                </div>
+                {errors.title && (
+                  <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                    <AlertCircle size={12} />
+                    {errors.title}
+                  </p>
+                )}
+              </div>
+
+              {/* 简介描述 */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  {t('customDescription')}
+                </label>
+                <div className={`cute-input-wrapper bg-white dark:bg-slate-800 rounded-lg px-4 py-3 flex items-center gap-2 ${
+                  errors.description ? 'border-red-300 dark:border-red-400' : ''
+                }`}>
+                  <input 
+                    type="text" 
+                    placeholder={t('customDescriptionPlaceholder')}
+                    className="w-full bg-transparent outline-none text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500"
+                    value={description}
+                    onChange={(e) => {
+                      setDescription(e.target.value)
+                      if (errors.description) {
+                        setErrors(prev => ({ ...prev, description: '' }))
+                      }
+                    }}
+                    disabled={isLoading}
+                  />
+                </div>
+                {errors.description && (
+                  <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                    <AlertCircle size={12} />
+                    {errors.description}
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="grid md:grid-cols-2 gap-4">
@@ -321,7 +400,7 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
                   <div className="flex flex-col">
                     <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('enableTransitionPage')}</span>
                     <span className="text-xs text-slate-500 dark:text-slate-400">
-                      {hasPasswordProtection ? '设置密码时自动启用' : '显示跳转确认页面'}
+                      {hasPasswordProtection ? t('autoEnabledWithPassword') : t('showTransitionPage')}
                     </span>
                   </div>
                 </div>
@@ -355,9 +434,9 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
                     <Shield size={16} />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">强制二次确认</span>
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t('forceConfirmManual')}</span>
                     <span className="text-xs text-slate-500 dark:text-slate-400">
-                      {hasPasswordProtection ? '设置密码时自动启用' : '需要用户确认'}
+                      {hasPasswordProtection ? t('autoEnabledWithPassword') : t('requireUserConfirm')}
                     </span>
                   </div>
                 </div>

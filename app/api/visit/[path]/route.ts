@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyPassword } from '@/lib/crypto'
-import { logVisit, logError } from '@/lib/logger'
+import Logger from '@/lib/logger'
 import { useTranslation } from '@/lib/translations'
 
 // 访问短链 - 获取链接信息
@@ -91,7 +91,7 @@ export async function POST(
 
   } catch (error) {
     console.error(t('processShortLinkAccessFailed') + ':', error)
-    await logError(t('processShortLinkAccessFailed'), error, request)
+    await Logger.logError(error as Error, Logger.extractRequestContext(request))
     return NextResponse.json({ error: t('apiServerError') }, { status: 500 })
   }
 }

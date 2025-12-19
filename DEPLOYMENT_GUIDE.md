@@ -1,122 +1,261 @@
-# 生产环境部署指南
+# 企业级日志系统部署指南
 
-## 打包完成
+## 🎉 重构完成
 
-项目已成功打包到 `dist` 目录，包含以下内容：
+企业级日志系统重构已完成！新系统支持时间筛选、高级搜索、安全审计等企业级功能。
 
-```
-dist/
-├── .next/              # Next.js 构建输出（包含独立运行时）
-├── node_modules/       # 生产环境依赖
-├── public/             # 静态资源
-├── .env.example        # 环境变量示例
-├── next.config.ts      # Next.js 配置
-├── package.json        # 项目配置
-├── server.js           # 服务器入口文件
-├── start.js            # 启动脚本
-└── README.md           # 部署说明
-```
+## 📋 部署步骤
 
-## 部署步骤
-
-### 1. 上传到服务器
-
-将整个 `dist` 目录上传到服务器：
+### 方法一：自动部署（推荐）
 
 ```bash
-# 使用 scp
-scp -r dist/ user@server:/path/to/app/
-
-# 或使用 rsync
-rsync -avz dist/ user@server:/path/to/app/
+# 运行自动部署脚本
+bun run scripts/deploy-enterprise-logs.ts
 ```
 
-### 2. 配置环境变量
-
-在服务器上创建 `.env` 文件：
+### 方法二：手动部署
 
 ```bash
-cd /path/to/app/dist
-cp .env.example .env
-# 编辑 .env 文件，填入实际的配置
+# 1. 备份数据库（重要！）
+cp prisma/dev.db prisma/dev.db.backup-$(date +%Y%m%d_%H%M%S)
+
+# 2. 更新数据库模式
+bunx prisma db push
+
+# 3. 重新生成 Prisma Client
+bunx prisma generate
+
+# 4. 迁移现有日志数据
+bun run scripts/migrate-logs.ts
+
+# 5. 验证构建
+bun run build
+
+# 6. 启动应用
+bun run dev
 ```
 
-### 3. 启动应用
+## ✅ 验证部署
 
-#### 方式一：直接启动
+### 1. 检查 API 端点
+
 ```bash
-cd /path/to/app/dist
-node server.js
+# 获取日志列表
+curl "http://localhost:3000/api/logs?page=1&limit=10"
+
+# 获取统计数据
+curl "http://localhost:3000/api/logs/stats"
+
+# 测试时间筛选
+curl "http://localhost:3000/api/logs?startDate=2024-01-01&endDate=2024-12-31"
+
+# 测试导出功能
+curl "http://localhost:3000/api/logs/export?format=csv" -o logs.csv
 ```
 
-#### 方式二：使用启动脚本
+### 2. 检查前端界面
+
+1. 访问管理后台
+2. 打开日志管理页面
+3. 测试以下功能：
+   - ✅ 时间范围选择
+   - ✅ 高级筛选
+   - ✅ 搜索功能
+   - ✅ 数据导出
+   - ✅ 统计图表
+
+## 🔧 新功能使用
+
+### 时间筛选
+
+```typescript
+// 查询最近7天的日志
+const logs = await fetch('/api/logs?startDate=2024-01-01&endDate=2024-01-07')
+
+// 快速时间范围
+- 今天
+- 昨天  
+- 最近7天
+- 最近30天
+- 本月
+```
+
+### 高级搜索
+
+```typescript
+// 多维度筛选
+const logs = await fetch('/api/logs?' + new URLSearchParams({
+  type: 'security',        // 日志类型
+  level: 'error',          // 日志级别
+  riskLevel: 'high',       // 风险级别
+  search: '登录失败',       // 全文搜索
+  ip: '192.168.1.1',       // IP筛选
+  startDate: '2024-01-01', // 开始时间
+  endDate: '2024-01-31'    // 结束时间
+}))
+```
+
+### 数据导出
+
+```typescript
+// 导出 CSV
+const csvData = await fetch('/api/logs/export?format=csv&startDate=2024-01-01')
+
+// 导出 JSON
+const jsonData = await fetch('/api/logs/export?format=json&type=security')
+```
+
+### 使用新的日志记录器
+
+```typescript
+import Logger, { LogType, LogLevel, RiskLevel } from '@/lib/logger'
+
+// 记录访问日志
+await Logger.logVisit('abc123', 'https://example.com', context)
+
+// 记录安全事件
+await Logger.logSecurity('failed_login', 'admin', RiskLevel.HIGH, context)
+
+// 自定义日志
+await Logger.log({
+  type: LogType.ADMIN,
+  level: LogLevel.WARN,
+  message: '管理员操作',
+  action: 'delete_link',
+  resource: 'shortlink:abc123',
+  riskLevel: RiskLevel.MEDIUM,
+  tags: ['admin', 'delete']
+}, context)
+```
+
+## 🛡️ 安全特性
+
+### 敏感信息脱敏
+
+系统会自动脱敏以下敏感字段：
+- password, token, secret, key
+- auth, credential  
+- ssn, credit_card
+- phone, email, address
+
+### 风险级别评估
+
+- **低风险 (low)**: 正常访问、常规操作
+- **中风险 (medium)**: 错误日志、管理员操作  
+- **高风险 (high)**: 安全事件、异常访问
+- **严重风险 (critical)**: 系统崩溃、安全攻击
+
+## 📊 性能优化
+
+### 数据库索引
+
+新系统包含以下性能优化索引：
+
+```prisma
+@@index([type, createdAt])
+@@index([level, createdAt])  
+@@index([category, createdAt])
+@@index([riskLevel, createdAt])
+@@index([ip, createdAt])
+@@index([userId, createdAt])
+```
+
+### 查询优化
+
+- 分页查询（默认50条/页，最大200条/页）
+- 时间范围索引优化
+- 缓存统计数据
+- 批量操作支持
+
+## 🔄 维护任务
+
+### 定期清理
+
 ```bash
-cd /path/to/app/dist
-node start.js
+# 清理30天前的日志
+curl -X DELETE "http://localhost:3000/api/logs/cleanup?days=30"
+
+# 设置定时任务（Linux/Mac）
+echo "0 2 * * * curl -X DELETE http://localhost:3000/api/logs/cleanup?days=30" | crontab -
 ```
 
-#### 方式三：使用 PM2（推荐）
+### 监控建议
+
 ```bash
-# 安装 PM2
-npm install -g pm2
+# 监控日志表大小
+du -h prisma/dev.db
 
-# 启动应用
-pm2 start server.js --name "link-app"
+# 监控查询性能
+tail -f logs/application.log | grep "slow query"
 
-# 设置开机自启
-pm2 startup
-pm2 save
+# 检查错误日志
+curl "http://localhost:3000/api/logs?level=error&limit=10"
 ```
 
-### 4. 使用 Nginx 反向代理（可选）
+## 🚨 故障排查
 
-创建 Nginx 配置：
+### 常见问题
 
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
+**问题1**: 迁移脚本执行失败
+```bash
+# 解决方案
+1. 检查数据库连接
+2. 确认 Prisma schema 已更新
+3. 从备份恢复后重试
 ```
 
-## Docker 部署（可选）
+**问题2**: 日志查询性能慢
+```bash
+# 解决方案  
+1. 检查数据库索引
+2. 清理过期日志
+3. 使用更具体的筛选条件
+```
 
-如果需要使用 Docker 部署，可以使用项目根目录的 `Dockerfile` 和 `docker-compose.yml`。
+**问题3**: 前端组件显示异常
+```bash
+# 解决方案
+1. 清除浏览器缓存
+2. 检查 API 响应格式
+3. 查看浏览器控制台错误
+```
 
-## 注意事项
+### 回滚方案
 
-1. **Node.js 版本**：确保服务器安装了 Node.js 18 或更高版本
-2. **端口配置**：默认端口为 3000，可通过环境变量 `PORT` 修改
-3. **数据库**：项目使用 SQLite，数据库文件位于 `prisma/dev.db`
-4. **环境变量**：务必配置所有必需的环境变量
-5. **进程管理**：生产环境建议使用 PM2 或 systemd 管理进程
+如需回滚到旧版本：
 
-## 性能优化建议
+```bash
+# 1. 恢复数据库备份
+cp prisma/dev.db.backup prisma/dev.db
 
-1. 使用 Nginx 作为反向代理
-2. 启用 gzip 压缩
-3. 配置 CDN 加速静态资源
-4. 定期备份数据库文件
-5. 监控应用性能和日志
+# 2. 回滚代码（如果使用 Git）
+git checkout HEAD~1
 
-## 故障排查
+# 3. 重新生成 Prisma Client
+bunx prisma generate
 
-如果启动失败，请检查：
+# 4. 重启应用
+bun run dev
+```
 
-1. Node.js 版本是否符合要求
-2. 环境变量是否正确配置
-3. 端口是否被占用
-4. 文件权限是否正确
-5. 查看错误日志定位问题
+## 📚 相关文档
+
+- [企业级日志系统总结](./ENTERPRISE_LOG_SYSTEM_SUMMARY.md)
+- [迁移指南](./ENTERPRISE_LOG_MIGRATION.md)
+- [API 文档](./API.md)
+- [开发文档](./DEVELOPMENT.md)
+
+## 🎯 下一步
+
+部署完成后，建议：
+
+1. **配置监控**: 设置日志告警和性能监控
+2. **用户培训**: 培训管理员使用新的日志功能
+3. **定期维护**: 设置自动清理和备份任务
+4. **安全审计**: 定期检查安全日志和风险事件
+
+---
+
+**🎉 恭喜！企业级日志系统部署完成！**
+
+现在您拥有了一个功能完整、安全可靠的企业级日志管理系统。

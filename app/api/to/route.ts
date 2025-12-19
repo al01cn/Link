@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isValidUrl, fetchPageTitle } from '@/lib/utils'
-import { logActivity, logError } from '@/lib/logger'
+import Logger, { LogType, LogLevel, LogCategory, RiskLevel } from '@/lib/logger'
 import { useTranslation } from '@/lib/translations'
 import { requestCache } from '@/lib/requestCache'
 import { apiCache } from '@/lib/apiCache'
@@ -112,7 +112,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
      * @description 捕获并记录所有未预期的错误，返回通用错误响应（Catch and log all unexpected errors, return generic error response）
      */
     console.error(t('processQuickRedirectFailed') + ':', error)
-    await logError(t('processQuickRedirectFailed'), error, request)
+    await Logger.logError(
+      error as Error, 
+      Logger.extractRequestContext(request),
+      {
+        endpoint: '/api/to',
+        action: 'process_quick_redirect',
+        processingTime: Date.now() - startTime
+      }
+    )
     return NextResponse.json({ error: t('apiServerError') }, { status: 500 })
   }
 }
@@ -271,9 +279,14 @@ async function processToRequest(request: NextRequest, t: any): Promise<QuickRedi
    * 记录TO跳转准备日志（Record TO redirect preparation log）
    * @description 记录通过TO路径准备跳转的请求，实际访问统计将在真正跳转时记录（Record TO path redirect preparation request, actual visit statistics will be recorded when actually redirecting）
    */
-  await logActivity({
-    type: 'prepare',
-    message: `${t('toPrepareRedirect')}: ${targetUrl}`,
+  await Logger.log({
+    type: LogType.SYSTEM,
+    level: LogLevel.INFO,
+    category: LogCategory.ACCESS,
+    messageKey: 'toPrepareRedirect',
+    messageParams: { targetUrl },
+    action: 'prepare_redirect',
+    resource: `to:${targetUrl}`,
     details: {
       targetUrl,
       title: title || t('externalLink'),
@@ -282,8 +295,9 @@ async function processToRequest(request: NextRequest, t: any): Promise<QuickRedi
       captchaEnabled,
       source: tokenParam ? 'token' : 'url'
     },
-    request
-  })
+    riskLevel: RiskLevel.LOW,
+    tags: ['to', 'redirect', 'prepare']
+  }, Logger.extractRequestContext(request))
 
   /**
    * 构建响应数据（Build response data）

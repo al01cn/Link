@@ -13,6 +13,7 @@ interface SafeRedirectClientProps {
   path: string
   targetUrl: string
   title?: string
+  description?: string // 添加简介描述字段
   hasPassword: boolean
   requireConfirm: boolean
   enableIntermediate: boolean
@@ -25,6 +26,7 @@ export default function SafeRedirectClient({
   path,
   targetUrl, 
   title, 
+  description,
   hasPassword, 
   requireConfirm, 
   enableIntermediate,
@@ -32,15 +34,14 @@ export default function SafeRedirectClient({
   expiresAt,
   autoRedirect = false
 }: SafeRedirectClientProps) {
-  // 如果是自动重定向模式，立即跳转，不渲染任何内容
-  useEffect(() => {
-    if (autoRedirect) {
-      window.location.href = targetUrl
-    }
-  }, [autoRedirect, targetUrl])
 
-  // 如果是自动重定向模式，返回空白页面或加载指示器
+  // 如果是自动重定向模式，返回加载指示器并在客户端执行跳转
   if (autoRedirect) {
+    // 使用 useEffect 在客户端执行跳转
+    useEffect(() => {
+      window.location.href = targetUrl
+    }, [targetUrl])
+
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
@@ -68,14 +69,16 @@ export default function SafeRedirectClient({
   const [preloadEnabled, setPreloadEnabled] = useState(true)
   const [autoFillPasswordEnabled, setAutoFillPasswordEnabled] = useState(true)
   const [autoFillAttempted, setAutoFillAttempted] = useState(false)
-  const [isExpired, setIsExpired] = useState(false)
   const [hasJumped, setHasJumped] = useState(false) // 防止重复跳转
   
-  // 检查链接是否过期
+  // 检查链接是否过期 - 在服务端和客户端都能正确计算
   const checkIfExpired = () => {
     if (!expiresAt) return false
     return new Date(expiresAt) <= new Date()
   }
+  
+  // 直接计算过期状态，避免水合不匹配
+  const isExpired = checkIfExpired()
 
   // 显示按钮的条件：需要密码 或 需要手动确认（与人机验证无关）
   const showButtons = hasPassword || requireConfirm
@@ -183,8 +186,7 @@ export default function SafeRedirectClient({
     setHasJumped(true) // 标记已经开始跳转
     
     // 检查是否过期
-    if (checkIfExpired()) {
-      setIsExpired(true)
+    if (isExpired) {
       return
     }
     
@@ -267,10 +269,9 @@ export default function SafeRedirectClient({
     
     setIsClient(true)
     
-    // 检查过期状态
-    if (checkIfExpired()) {
-      setIsExpired(true)
-      return // 如果过期，不执行后续逻辑
+    // 如果过期，不执行后续逻辑
+    if (isExpired) {
+      return
     }
     
     // 检查域名访问权限
@@ -469,146 +470,163 @@ export default function SafeRedirectClient({
       </div>
 
       <div className="min-h-screen flex items-center justify-center p-4">
-        <div className={`cute-card max-w-md w-full p-8 text-center ${isClient ? 'animate-fade-in' : ''}`}>
-          <div className={`w-16 h-16 ${getIconAndColor().bgColor} ${getIconAndColor().color} rounded-full flex items-center justify-center mx-auto mb-6`}>
-            {(() => {
-              const IconComponent = getIconAndColor().icon
-              return <IconComponent size={32} />
-            })()}
+        {!isClient ? (
+          // 服务端渲染时显示加载状态，避免水合不匹配
+          <div className="cute-card max-w-md w-full p-6 sm:p-8 text-center">
+            <div className="w-16 h-16 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Zap size={32} />
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-800 mb-2 wrap-break-word">加载中...</h2>
+            <p className="text-slate-500 mb-6 text-sm leading-relaxed">正在准备跳转</p>
           </div>
-          
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">
-            {getDisplayTitle()}
-          </h2>
-          <p className="text-slate-500 mb-6 text-sm leading-relaxed">
-            {getDescription()}
-          </p>
+        ) : (
+          <div className="cute-card max-w-md w-full p-6 sm:p-8 text-center animate-fade-in">
+            <div className={`w-16 h-16 ${getIconAndColor().bgColor} ${getIconAndColor().color} rounded-full flex items-center justify-center mx-auto mb-6`}>
+              {(() => {
+                const IconComponent = getIconAndColor().icon
+                return <IconComponent size={32} />
+              })()}
+            </div>
+            
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-800 mb-2 wrap-break-word">
+              {getDisplayTitle()}
+            </h2>
+            <p className="text-slate-500 mb-6 text-sm leading-relaxed wrap-break-word">
+              {getDescription()}
+            </p>
 
-          {/* 过期或域名被拦截时不显示目标链接信息 */}
-          {!isExpired && !domainBlocked && (
-            <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-4 mb-6 text-left border border-slate-100 dark:border-slate-600 relative overflow-hidden group">
+            {/* 目标链接信息 */}
+            <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-3 sm:p-4 mb-6 text-left border border-slate-100 dark:border-slate-600 relative overflow-hidden group">
               <div className="absolute top-0 right-0 p-2 opacity-50 group-hover:opacity-100 transition-opacity">
                 <ExternalLink size={16} className="text-slate-400" />
               </div>
               <div className="text-xs text-slate-400 uppercase font-bold mb-1">{t('targetUrl')}</div>
-              <div className="text-[--color-primary] truncate font-medium">{targetUrl}</div>
-              {title && (
-                <div className="text-sm text-slate-600 mt-2 flex items-center gap-2">
-                  <div className="w-1 h-1 bg-slate-400 rounded-full"></div>
-                  {title}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 过期或域名被拦截时不显示密码输入 */}
-          {!isExpired && !domainBlocked && hasPassword && (
-            <div className={`mb-6 text-left ${isClient ? 'animate-fade-in' : ''}`}>
-              <label className="text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
-                <Lock size={14} className="text-[--color-warning]" /> 
-                {t('passwordProtected')}
-              </label>
-              <div className={`cute-input-wrapper bg-white rounded-lg px-4 py-3 flex items-center gap-2 ${
-                error ? 'border-[--color-error] ring-1 ring-[--color-error]' : ''
-              }`}>
-                <Lock size={18} className="text-slate-400" />
-                <input 
-                  type="password" 
-                  placeholder={t('enterPassword')}
-                  className="w-full bg-transparent outline-none text-slate-800"
-                  value={password}
-                  onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                  onKeyDown={(e) => e.key === 'Enter' && !isProcessing && handleProceed()}
-                  disabled={isProcessing}
-                />
+              <div className="text-[--color-primary] font-medium break-all text-sm leading-tight max-h-12 overflow-hidden">
+                {targetUrl.length > 60 ? `${targetUrl.substring(0, 60)}...` : targetUrl}
               </div>
-              {error && (
-                <div className={`flex items-center gap-1 text-[--color-error] text-xs mt-2 font-medium ${isClient ? 'animate-fade-in' : ''}`}>
-                  <AlertCircle size={12} />
-                  {error}
+              {title && (
+                <div className="text-sm text-slate-600 mt-2 flex items-start gap-2">
+                  <div className="w-1 h-1 bg-slate-400 rounded-full mt-2 shrink-0"></div>
+                  <div className="wrap-break-word min-w-0 flex-1">{title}</div>
+                </div>
+              )}
+              {description && (
+                <div className="text-sm text-slate-500 mt-2 leading-relaxed wrap-break-word">
+                  {description}
                 </div>
               )}
             </div>
-          )}
 
-          {/* 人机验证组件 */}
-          {!isExpired && !domainBlocked && captchaEnabled && !captchaVerified && (
-            <div className={`mb-6 ${isClient ? 'animate-fade-in' : ''}`}>
-              <TurnstileWidget
-                onVerify={handleCaptchaSuccess}
-                onError={handleCaptchaError}
-                onExpire={handleCaptchaExpire}
-                className="mb-4"
-              />
-              {captchaError && (
-                <div className={`flex items-center gap-1 text-[--color-error] text-xs mt-2 font-medium justify-center ${isClient ? 'animate-fade-in' : ''}`}>
-                  <AlertCircle size={12} />
-                  {captchaError}
+            {/* 密码输入 */}
+            {!isExpired && !domainBlocked && hasPassword && (
+              <div className="mb-6 text-left">
+                <label className="text-sm font-medium text-slate-700 mb-2 flex items-center gap-2 wrap-break-word">
+                  <Lock size={14} className="text-[--color-warning] shrink-0" /> 
+                  <span className="min-w-0">{t('passwordProtected')}</span>
+                </label>
+                <div className={`cute-input-wrapper bg-white rounded-lg px-3 sm:px-4 py-3 flex items-center gap-2 ${
+                  error ? 'border-[--color-error] ring-1 ring-[--color-error]' : ''
+                }`}>
+                  <Lock size={18} className="text-slate-400 shrink-0" />
+                  <input 
+                    type="password" 
+                    placeholder={t('enterPassword')}
+                    className="w-full bg-transparent outline-none text-slate-800 min-w-0"
+                    value={password}
+                    onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                    onKeyDown={(e) => e.key === 'Enter' && !isProcessing && handleProceed()}
+                    disabled={isProcessing}
+                  />
                 </div>
-              )}
-            </div>
-          )}
-
-          {/* 倒计时消息（仅自动跳转模式且未过期且域名未被拦截） */}
-          {!isExpired && !domainBlocked && enableCountdown && !isProcessing && (
-            <div className={`mb-4 text-sm text-slate-400 font-medium ${isClient ? 'animate-fade-in' : ''}`}>
-              <Clock size={14} className="inline mr-1 relative -top-px" />
-              {t('redirectingIn', { s: countdown })}
-            </div>
-          )}
-
-          {/* 处理中状态（未过期且域名未被拦截时） */}
-          {!isExpired && !domainBlocked && isProcessing && (
-            <div className={`mb-4 text-sm text-[--color-primary] font-medium ${isClient ? 'animate-fade-in' : ''} flex items-center justify-center gap-2`}>
-              <div className="w-4 h-4 border-2 border-[--color-primary]/30 border-t-[--color-primary] rounded-full animate-spin"></div>
-              {t('processing')}
-            </div>
-          )}
-
-          {/* 操作按钮（仅手动确认或密码模式且未过期且域名未被拦截） */}
-          {!isExpired && !domainBlocked && showButtons && !isProcessing && (
-            <div className={`flex gap-3 ${isClient ? 'animate-fade-in' : ''}`}>
-              <button 
-                onClick={handleCancel}
-                className="flex-1 px-4 py-3 rounded-xl font-medium text-slate-600 hover:bg-slate-100 transition-colors text-sm"
-              >
-                {t('cancelVisit')}
-              </button>
-              <button 
-                onClick={() => handleProceed()}
-                disabled={(hasPassword && !password) || (captchaEnabled && !captchaVerified)}
-                className={`flex-1 shine-effect text-white px-4 py-3 rounded-xl font-medium transition-colors shadow-lg shadow-blue-200 text-sm flex items-center justify-center gap-2 ${
-                  (hasPassword && !password) || (captchaEnabled && !captchaVerified) 
-                    ? 'bg-slate-400 cursor-not-allowed' 
-                    : 'bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)]'
-                }`}
-              >
-                {hasPassword ? (
-                  <>
-                    <Lock size={16} />
-                    {t('verifyAndJump')}
-                  </>
-                ) : (
-                  <>
-                    {t('continue')} <ArrowRight size={16} />
-                  </>
+                {error && (
+                  <div className="flex items-start gap-1 text-[--color-error] text-xs mt-2 font-medium">
+                    <AlertCircle size={12} className="shrink-0 mt-0.5" />
+                    <span className="wrap-break-word min-w-0">{error}</span>
+                  </div>
                 )}
-              </button>
-            </div>
-          )}
+              </div>
+            )}
 
-          {/* 过期状态的返回按钮 */}
-          {isExpired && (
-            <div className={`flex justify-center ${isClient ? 'animate-fade-in' : ''}`}>
-              <button 
-                onClick={handleCancel}
-                className="px-6 py-3 rounded-xl font-medium text-slate-600 hover:bg-slate-100 transition-colors text-sm border border-slate-200 hover:border-slate-300"
-              >
-                {t('goBack')}
-              </button>
-            </div>
-          )}
-        </div>
+            {/* 人机验证组件 */}
+            {!isExpired && !domainBlocked && captchaEnabled && !captchaVerified && (
+              <div className="mb-6">
+                <TurnstileWidget
+                  onVerify={handleCaptchaSuccess}
+                  onError={handleCaptchaError}
+                  onExpire={handleCaptchaExpire}
+                  className="mb-4"
+                />
+                {captchaError && (
+                  <div className="flex items-start gap-1 text-[--color-error] text-xs mt-2 font-medium justify-center">
+                    <AlertCircle size={12} className="shrink-0 mt-0.5" />
+                    <span className="wrap-break-word min-w-0 text-center">{captchaError}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 倒计时消息 */}
+            {!isExpired && !domainBlocked && enableCountdown && !isProcessing && (
+              <div className="mb-4 text-sm text-slate-400 font-medium flex items-center justify-center gap-1 wrap-break-word">
+                <Clock size={14} className="shrink-0" />
+                <span className="min-w-0">{t('redirectingIn', { s: countdown })}</span>
+              </div>
+            )}
+
+            {/* 处理中状态 */}
+            {!isExpired && !domainBlocked && isProcessing && (
+              <div className="mb-4 text-sm text-[--color-primary] font-medium flex items-center justify-center gap-2 wrap-break-word">
+                <div className="w-4 h-4 border-2 border-[--color-primary]/30 border-t-[--color-primary] rounded-full animate-spin shrink-0"></div>
+                <span className="min-w-0">{t('processing')}</span>
+              </div>
+            )}
+
+            {/* 操作按钮 */}
+            {!isExpired && !domainBlocked && showButtons && !isProcessing && (
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button 
+                  onClick={handleCancel}
+                  className="flex-1 px-4 py-3 rounded-xl font-medium text-slate-600 hover:bg-slate-100 transition-colors text-sm min-w-0"
+                >
+                  {t('cancelVisit')}
+                </button>
+                <button 
+                  onClick={() => handleProceed()}
+                  disabled={(hasPassword && !password) || (captchaEnabled && !captchaVerified)}
+                  className={`flex-1 shine-effect text-white px-4 py-3 rounded-xl font-medium transition-colors shadow-lg shadow-blue-200 text-sm flex items-center justify-center gap-2 min-w-0 ${
+                    (hasPassword && !password) || (captchaEnabled && !captchaVerified) 
+                      ? 'bg-slate-400 cursor-not-allowed' 
+                      : 'bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)]'
+                  }`}
+                >
+                  {hasPassword ? (
+                    <>
+                      <Lock size={16} className="shrink-0" />
+                      <span className="truncate">{t('verifyAndJump')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="truncate">{t('continue')}</span>
+                      <ArrowRight size={16} className="shrink-0" />
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* 过期状态的返回按钮 */}
+            {isExpired && (
+              <div className="flex justify-center">
+                <button 
+                  onClick={handleCancel}
+                  className="px-4 sm:px-6 py-3 rounded-xl font-medium text-slate-600 hover:bg-slate-100 transition-colors text-sm border border-slate-200 hover:border-slate-300 min-w-0 wrap-break-word"
+                >
+                  {t('goBack')}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

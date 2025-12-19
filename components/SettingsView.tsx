@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Settings, Shield, Clock, X, Check, Plus, Trash2, Zap } from 'lucide-react'
+import { Settings, Shield, Clock, X, Check, Plus, Trash2, Zap, Download, Upload, FileText } from 'lucide-react'
 import { TranslationKey } from '@/lib/translations'
 import { useConfirmDialog, useNotificationDialog } from '@/lib/useDialog'
+import { useGlobalMessage } from '@/lib/useGlobalMessage'
 import ConfirmDialog from './ConfirmDialog'
 import NotificationDialog from './NotificationDialog'
 
@@ -41,10 +42,14 @@ export default function SettingsView({ isOpen, onClose, settings, setSettings, t
   const [isSaving, setIsSaving] = useState(false)
   const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null)
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   
   // 对话框 hooks
   const confirmDialog = useConfirmDialog()
   const notificationDialog = useNotificationDialog()
+  const { showMessage } = useGlobalMessage()
 
   // 客户端水合完成后启用动画
   useEffect(() => {
@@ -66,6 +71,10 @@ export default function SettingsView({ isOpen, onClose, settings, setSettings, t
     if (isOpen) {
       dialog.showModal()
       setIsDarkMode(document.documentElement.classList.contains('dark'))
+      // 清空文件输入，防止重复导入
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
     } else {
       dialog.close()
     }
@@ -339,6 +348,149 @@ export default function SettingsView({ isOpen, onClose, settings, setSettings, t
     }
   }
 
+  // 导出配置
+  const handleExport = async (type: 'settings' | 'links' | 'all') => {
+    const token = typeof window !== 'undefined' ? sessionStorage.getItem('adminToken') : null
+    if (!token) {
+      notificationDialog.notify({
+        type: 'error',
+        message: '未找到管理员权限，请重新登录'
+      })
+      return
+    }
+
+    setIsExporting(true)
+    try {
+      // 直接跳转到API端点触发下载
+      const url = `/api/config/export?type=${type}&token=${encodeURIComponent(token)}`
+      window.location.href = url
+
+      // 关闭设置弹窗后显示导出成功消息
+      setTimeout(() => {
+        onClose() // 先关闭设置弹窗
+        setTimeout(() => {
+          showMessage({
+            type: 'success',
+            message: t('exportSuccess'),
+            duration: 3000
+          })
+        }, 100) // 等待弹窗关闭动画完成
+      }, 500)
+    } catch (error) {
+      console.error('导出失败:', error)
+      notificationDialog.notify({
+        type: 'error',
+        message: t('exportFailed')
+      })
+    } finally {
+      setTimeout(() => {
+        setIsExporting(false)
+      }, 1000)
+    }
+  }
+
+  // 处理文件选择
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (!file.name.endsWith('.json')) {
+      notificationDialog.notify({
+        type: 'error',
+        message: t('invalidFileFormat')
+      })
+      return
+    }
+
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      
+      // 显示导入预览对话框
+      const confirmed = await confirmDialog.confirm({
+        type: 'warning',
+        title: t('confirmImport'),
+        message: t('importWarning'),
+        confirmText: t('proceedImport'),
+        cancelText: t('cancelImport')
+      })
+
+      if (confirmed) {
+        await handleImport(data)
+      }
+    } catch (error) {
+      console.error('文件读取失败:', error)
+      notificationDialog.notify({
+        type: 'error',
+        message: t('fileReadError')
+      })
+    } finally {
+      // 无论成功还是失败都清空文件输入
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
+  // 导入配置
+  const handleImport = async (data: any) => {
+    const token = typeof window !== 'undefined' ? sessionStorage.getItem('adminToken') : null
+    if (!token) {
+      notificationDialog.notify({
+        type: 'error',
+        message: '未找到管理员权限，请重新登录'
+      })
+      return
+    }
+
+    setIsImporting(true)
+    try {
+      const response = await fetch('/api/config/import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ data, type: 'all' })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        
+        // 重新加载设置
+        await loadSettings()
+        
+        // 立即关闭设置弹窗
+        onClose()
+        
+        // 使用全局消息提示导入成功
+        showMessage({
+          type: 'success',
+          message: `${t('importSuccess')} (${result.importedCount} 项)`,
+          duration: 4000
+        })
+      } else {
+        const error = await response.json()
+        notificationDialog.notify({
+          type: 'error',
+          message: error.error || t('importFailed')
+        })
+      }
+    } catch (error) {
+      console.error('导入失败:', error)
+      notificationDialog.notify({
+        type: 'error',
+        message: t('importFailed')
+      })
+    } finally {
+      setIsImporting(false)
+      // 确保导入完成后清空文件输入
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
   // 获取当前模式的域名列表
   const currentDomains = (domainRules || []).filter(rule => rule.type === settings.mode)
 
@@ -599,11 +751,11 @@ export default function SettingsView({ isOpen, onClose, settings, setSettings, t
             
             {/* 域名规范说明 */}
             <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="text-sm font-medium text-blue-800 mb-2">域名填写规范</h4>
+              <h4 className="text-sm font-medium text-blue-800 mb-2">{t('domainInputRules')}</h4>
               <div className="text-xs text-blue-700 space-y-1">
-                <div><code className="bg-blue-100 px-1 rounded">*.example.com</code> - 匹配所有子域名（包括主域名）</div>
-                <div><code className="bg-blue-100 px-1 rounded">example.com</code> - 只匹配主域名，不包括子域名</div>
-                <div><code className="bg-blue-100 px-1 rounded">sub.example.com</code> - 只匹配特定子域名</div>
+                <div><code className="bg-blue-100 px-1 rounded">*.example.com</code> - {t('wildcardDomainRule')}</div>
+                <div><code className="bg-blue-100 px-1 rounded">example.com</code> - {t('mainDomainRule')}</div>
+                <div><code className="bg-blue-100 px-1 rounded">sub.example.com</code> - {t('subDomainRule')}</div>
               </div>
             </div>
 
@@ -613,7 +765,7 @@ export default function SettingsView({ isOpen, onClose, settings, setSettings, t
                 <div className="cute-input-wrapper flex-1 bg-white rounded-lg px-3 py-2 flex items-center gap-2 text-sm">
                   <input 
                     type="text" 
-                    placeholder="例如：*.example.com 或 example.com"
+                    placeholder={t('domainInputPlaceholder')}
                     className="w-full outline-none text-slate-700 dark:text-slate-200"
                     value={newDomain}
                     onChange={(e) => setNewDomain(e.target.value)}
@@ -668,18 +820,18 @@ export default function SettingsView({ isOpen, onClose, settings, setSettings, t
                         }`}></span>
                         <span className="font-mono">{rule.domain}</span>
                         {isWildcard && (
-                          <span className="text-xs bg-blue-100 text-blue-600 px-1 rounded" title="匹配所有子域名">
-                            通配符
+                          <span className="text-xs bg-blue-100 text-blue-600 px-1 rounded" title={t('wildcardDomainRule')}>
+                            {t('wildcardLabel')}
                           </span>
                         )}
                         {isSubdomain && !isWildcard && (
-                          <span className="text-xs bg-green-100 text-green-600 px-1 rounded" title="特定子域名">
-                            子域名
+                          <span className="text-xs bg-green-100 text-green-600 px-1 rounded" title={t('subDomainRule')}>
+                            {t('subdomainLabel')}
                           </span>
                         )}
                         {!isWildcard && !isSubdomain && (
-                          <span className="text-xs bg-gray-100 text-gray-600 px-1 rounded" title="仅主域名">
-                            主域名
+                          <span className="text-xs bg-gray-100 text-gray-600 px-1 rounded" title={t('mainDomainRule')}>
+                            {t('mainDomainLabel')}
                           </span>
                         )}
                         <button
@@ -705,6 +857,112 @@ export default function SettingsView({ isOpen, onClose, settings, setSettings, t
             </div>
           </div>
 
+          {/* 配置导入导出 */}
+          <div className={isClient ? 'animate__animated animate__fadeIn' : ''}>
+            <h3 className={`text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+              <FileText size={16} />
+              {t('configImportExport')}
+            </h3>
+            <div className="bg-slate-50 rounded-xl p-6 border border-slate-100">
+              <div className="grid md:grid-cols-2 gap-4">
+                {/* 导出配置 */}
+                <div className="space-y-3">
+                  <h4 className="font-medium text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                    <Download size={16} />
+                    {t('exportConfig')}
+                  </h4>
+                  <p className="text-xs text-slate-500 mb-3">{t('exportConfigDesc')}</p>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => handleExport('settings')}
+                      disabled={isExporting}
+                      className={`w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                        isExporting 
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                          : 'bg-blue-500 text-white hover:bg-blue-600'
+                      }`}
+                    >
+                      {isExporting ? (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <Download size={14} />
+                      )}
+                      {t('exportSettings')}
+                    </button>
+                    <button
+                      onClick={() => handleExport('links')}
+                      disabled={isExporting}
+                      className={`w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                        isExporting 
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                          : 'bg-green-500 text-white hover:bg-green-600'
+                      }`}
+                    >
+                      {isExporting ? (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <Download size={14} />
+                      )}
+                      {t('exportLinks')}
+                    </button>
+                    <button
+                      onClick={() => handleExport('all')}
+                      disabled={isExporting}
+                      className={`w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                        isExporting 
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                          : 'bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]'
+                      }`}
+                    >
+                      {isExporting ? (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <Download size={14} />
+                      )}
+                      {t('exportAll')}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 导入配置 */}
+                <div className="space-y-3">
+                  <h4 className="font-medium text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                    <Upload size={16} />
+                    {t('importConfig')}
+                  </h4>
+                  <p className="text-xs text-slate-500 mb-3">{t('importConfigDesc')}</p>
+                  <div className="space-y-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".json"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isImporting}
+                      className={`w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 border-2 border-dashed ${
+                        isImporting 
+                          ? 'border-slate-200 text-slate-400 cursor-not-allowed' 
+                          : 'border-slate-300 text-slate-600 hover:border-slate-400 hover:text-slate-700'
+                      }`}
+                    >
+                      {isImporting ? (
+                        <div className="w-4 h-4 border-2 border-slate-400 border-t-slate-600 rounded-full animate-spin" />
+                      ) : (
+                        <Upload size={14} />
+                      )}
+                      {t('selectFile')}
+                    </button>
+                    <div className="text-xs text-slate-400 text-center">
+                      {t('supportJsonFormat')}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
         </div>
       </div>

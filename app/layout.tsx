@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { defaultMetadata } from "@/lib/metadata";
 import { ThemeProvider } from "@/lib/ThemeContext";
+import { GlobalMessageProvider } from "@/lib/useGlobalMessage";
 
 // 使用默认的中文元数据，客户端会根据语言偏好动态更新
 export const metadata: Metadata = defaultMetadata;
@@ -28,7 +29,9 @@ export default function RootLayout({
       </head>
       <body className="antialiased" suppressHydrationWarning={true}>
         <ThemeProvider>
-          {children}
+          <GlobalMessageProvider>
+            {children}
+          </GlobalMessageProvider>
         </ThemeProvider>
       </body>
     </html>

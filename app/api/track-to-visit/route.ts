@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { logActivity, logError } from '@/lib/logger'
+import Logger from '@/lib/logger'
 import { useTranslation } from '@/lib/translations'
 
 /**
@@ -21,24 +21,13 @@ export async function POST(request: NextRequest) {
     }
 
     // 记录TO模式的真实访问统计
-    await logActivity({
-      type: 'visit',
-      message: `${t('toModeRealVisit')}: ${targetUrl}`,
-      details: {
-        targetUrl,
-        title: title || t('externalLink'),
-        type: type || 'auto',
-        source: source || 'unknown',
-        mode: 'to'
-      },
-      request
-    })
+    await Logger.logVisit('to-mode', targetUrl, Logger.extractRequestContext(request))
 
     return NextResponse.json({ success: true })
 
   } catch (error) {
     console.error(t('trackToVisitFailed') + ':', error)
-    await logError(t('trackToVisitFailed'), error, request)
+    await Logger.logError(error as Error, Logger.extractRequestContext(request))
     return NextResponse.json({ error: t('apiServerError') }, { status: 500 })
   }
 }

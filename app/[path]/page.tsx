@@ -56,6 +56,7 @@ export default async function ShortLinkPage({ params, searchParams }: PageProps)
           path={path}
           targetUrl={shortLink.originalUrl}
           title={shortLink.title || undefined}
+          description={shortLink.description || undefined}
           hasPassword={false}
           requireConfirm={false}
           enableIntermediate={false}
@@ -71,6 +72,7 @@ export default async function ShortLinkPage({ params, searchParams }: PageProps)
         path={path}
         targetUrl={shortLink.originalUrl}
         title={shortLink.title || undefined}
+        description={shortLink.description || undefined}
         hasPassword={!!shortLink.password}
         requireConfirm={shortLink.requireConfirm}
         enableIntermediate={shortLink.enableIntermediate}

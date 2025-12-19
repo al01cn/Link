@@ -9,6 +9,7 @@ import TurnstileWidget from './TurnstileWidget'
 interface SafeRedirectViewProps {
   targetUrl: string
   title?: string
+  description?: string // 添加简介描述字段
   hasPassword: boolean
   requireConfirm: boolean
   waitTime: number
@@ -31,6 +32,7 @@ interface SafeRedirectViewProps {
 export default function SafeRedirectView({ 
   targetUrl, 
   title, 
+  description,
   hasPassword, 
   requireConfirm, 
   waitTime,
@@ -446,11 +448,18 @@ export default function SafeRedirectView({
               <ExternalLink size={16} className="text-slate-400" />
             </div>
             <div className="text-xs text-slate-400 uppercase font-bold mb-1">{t('targetUrl')}</div>
-            <div className="text-[var(--color-primary)] truncate font-medium">{targetUrl}</div>
+            <div className="text-[var(--color-primary)] font-medium break-all text-sm leading-tight max-h-12 overflow-hidden">
+              {targetUrl.length > 60 ? `${targetUrl.substring(0, 60)}...` : targetUrl}
+            </div>
             {title && (
               <div className="text-sm text-slate-600 mt-2 flex items-center gap-2">
                 <div className="w-1 h-1 bg-slate-400 rounded-full"></div>
                 {title}
+              </div>
+            )}
+            {description && (
+              <div className="text-sm text-slate-500 mt-2 leading-relaxed">
+                {description}
               </div>
             )}
           </div>

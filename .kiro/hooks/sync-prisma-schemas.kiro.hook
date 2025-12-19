@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "name": "同步Prisma Schema结构",
+  "description": "当检测到多个版本的schema.prisma文件时，自动将其他版本的数据结构同步到主schema.prisma文件，只同步结构不同步数据库字段",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "prisma/schema.*.prisma",
+      "prisma/schema.prisma"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "检测到Prisma schema文件发生变化。请检查prisma目录下是否存在多个schema文件（如schema.mysql.prisma、schema.postgresql.prisma、schema.sqlite.prisma等），如果存在多个版本，请将其他版本的数据结构同步到主schema.prisma文件中。注意：只同步数据模型结构（model定义、字段类型、关系等），不要同步数据库连接配置和字段级别的数据库特定设置。确保所有schema文件的数据模型保持一致。"
+  }
+}

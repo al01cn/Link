@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { generateShortPath, isValidUrl, fetchPageTitle, extractDomain, checkDomainAccessServer, getBaseUrl, generateShortUrl } from '@/lib/utils'
 import { encryptPassword } from '@/lib/crypto'
-import { logCreate, logError } from '@/lib/logger'
+import Logger from '@/lib/logger'
 import { translateForRequest } from '@/lib/translations'
 import { verifyAdminToken } from '@/lib/adminAuth'
 
@@ -18,6 +18,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { 
       originalUrl, 
+      title,
+      description,
       customPath, 
       password, 
       expiresAt, 
@@ -98,8 +100,8 @@ export async function POST(request: NextRequest) {
       path = generateShortPath()
     }
 
-    // 尝试获取页面标题
-    const title = await fetchPageTitle(originalUrl)
+    // 使用用户提供的标题，如果没有则尝试自动获取页面标题
+    const finalTitle = title?.trim() || await fetchPageTitle(originalUrl)
 
     // 加密密码（如果有的话）
     const encryptedPassword = password ? encryptPassword(password) : null
@@ -109,7 +111,8 @@ export async function POST(request: NextRequest) {
       data: {
         path,
         originalUrl,
-        title,
+        title: finalTitle,
+        description: description?.trim() || null,
         password: encryptedPassword,
         expiresAt: expiresAt ? new Date(expiresAt) : null,
         requireConfirm,
@@ -118,13 +121,7 @@ export async function POST(request: NextRequest) {
     })
 
     // 记录创建日志
-    await logCreate(shortLink.path, originalUrl, request, {
-      shortLinkId: shortLink.id,
-      title,
-      hasPassword: !!password,
-      requireConfirm,
-      enableIntermediate
-    })
+    await Logger.logCreate(shortLink.path, originalUrl, Logger.extractRequestContext(request))
 
     return NextResponse.json({
       id: shortLink.id,
@@ -132,6 +129,7 @@ export async function POST(request: NextRequest) {
       shortUrl: generateShortUrl(shortLink.path, request),
       originalUrl: shortLink.originalUrl,
       title: shortLink.title,
+      description: shortLink.description,
       views: shortLink.views,
       createdAt: shortLink.createdAt,
       expiresAt: shortLink.expiresAt,
@@ -142,7 +140,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('创建短链失败:', error)
-    await logError('创建短链失败', error, request)
+    await Logger.logError(error as Error, Logger.extractRequestContext(request))
     return NextResponse.json({ error: translateForRequest(request, 'serverError') }, { status: 500 })
   }
 }
@@ -167,6 +165,7 @@ export async function GET(request: NextRequest) {
       shortUrl: generateShortUrl(link.path, request),
       originalUrl: link.originalUrl,
       title: link.title,
+      description: link.description,
       views: link.views,
       createdAt: link.createdAt,
       expiresAt: link.expiresAt,

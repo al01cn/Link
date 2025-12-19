@@ -13,7 +13,8 @@ model ShortLink {
   id           String   @id @default(uuid()) @db.VarChar(36) // 使用UUID作为主键
   path         String   @unique @db.VarChar(255) // 短链路径，如 "abc123"
   originalUrl  String   @db.Text // 原始长链接
-  title        String?  @db.VarChar(500) // 页面标题（自动抓取）
+  title        String?  @db.VarChar(500) // 页面标题（自动抓取或用户自定义）
+  description  String?  @db.VarChar(1000) // 简介描述（用户自定义）
   
   // 安全选项
   password     String?  @db.VarChar(255) // 访问密码
@@ -67,13 +68,52 @@ model Admin {
   updatedAt DateTime @updatedAt
 }
 
-// 系统日志模型
+// 系统日志模型 - 企业级安全日志
 model Log {
-  id        String   @id @default(uuid()) @db.VarChar(36) // 使用UUID作为主键
-  type      String   @db.VarChar(50) // 日志类型: "visit" | "create" | "error"
-  message   String   @db.Text // 日志消息
-  details   String?  @db.Text // 详细信息（JSON字符串）
-  ip        String?  @db.VarChar(45) // 客户端IP
-  userAgent String?  @db.Text // 用户代理
-  createdAt DateTime @default(now())
+  id           String   @id @default(uuid()) @db.VarChar(36) // 使用UUID作为主键
+  type         String   @db.VarChar(50) // 日志类型: "visit" | "create" | "error" | "security" | "admin" | "system"
+  level        String   @default("info") @db.VarChar(20) // 日志级别: "debug" | "info" | "warn" | "error" | "critical"
+  category     String   @default("general") @db.VarChar(50) // 日志分类: "auth" | "access" | "operation" | "security" | "system" | "general"
+  
+  // 消息相关
+  messageKey   String   @db.VarChar(255) // 消息模板键值，如 "logVisitShortLink"
+  messageParams String? @db.Text // 消息参数（JSON字符串），如 {"path":"abc","url":"https://..."}
+  
+  // 详细信息
+  details      String?  @db.Text // 详细信息（JSON字符串）
+  stackTrace   String?  @db.Text // 错误堆栈信息（仅错误日志）
+  
+  // 请求信息
+  ip           String?  @db.VarChar(45) // 客户端IP
+  userAgent    String?  @db.Text // 用户代理
+  referer      String?  @db.Text // 来源页面
+  requestId    String?  @db.VarChar(255) // 请求ID（用于追踪）
+  sessionId    String?  @db.VarChar(255) // 会话ID
+  
+  // 用户信息
+  userId       String?  @db.VarChar(36) // 用户ID（如果有）
+  username     String?  @db.VarChar(255) // 用户名（如果有）
+  
+  // 操作信息
+  action       String?  @db.VarChar(255) // 执行的操作
+  resource     String?  @db.VarChar(255) // 操作的资源
+  method       String?  @db.VarChar(10) // HTTP方法
+  endpoint     String?  @db.VarChar(500) // API端点
+  statusCode   Int?     // HTTP状态码
+  responseTime Int?     // 响应时间（毫秒）
+  
+  // 安全相关
+  riskLevel    String   @default("low") @db.VarChar(20) // 风险级别: "low" | "medium" | "high" | "critical"
+  tags         String?  @db.Text // 标签（JSON数组字符串）
+  
+  // 时间信息
+  createdAt    DateTime @default(now())
+  
+  // 索引优化
+  @@index([type, createdAt])
+  @@index([level, createdAt])
+  @@index([category, createdAt])
+  @@index([riskLevel, createdAt])
+  @@index([ip, createdAt])
+  @@index([userId, createdAt])
 }

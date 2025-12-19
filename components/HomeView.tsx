@@ -5,6 +5,7 @@ import { Link2, ArrowRight, Settings, ChevronDown, Lock, Shield, Zap, Eye, Copy,
 import { formatTimeAgo, formatTimeRemaining } from '@/lib/utils'
 import { useHostname } from '@/lib/useHostname'
 import { TranslationKey } from '@/lib/translations'
+import { useLanguage } from '@/lib/LanguageContext'
 import { useConfirmDialog, useNotificationDialog } from '@/lib/useDialog'
 import { requestCache } from '@/lib/requestCache'
 import ConfirmDialog from './ConfirmDialog'
@@ -18,6 +19,7 @@ interface ShortLink {
   shortUrl: string
   originalUrl: string
   title?: string
+  description?: string // 添加简介字段
   views: number
   createdAt: string
   expiresAt?: string // 添加过期时间字段
@@ -41,6 +43,9 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
   
   // 获取当前主机名（客户端专用）
   const hostname = useHostname()
+  
+  // 获取语言上下文
+  const { language } = useLanguage()
   
   // 搜索和筛选状态
   const [searchQuery, setSearchQuery] = useState('')
@@ -154,6 +159,8 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
   }, [showPasswordModal])
   
   // 高级选项状态
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
   const [customPath, setCustomPath] = useState('')
   const [password, setPassword] = useState('')
   const [expiresAt, setExpiresAt] = useState('')
@@ -279,6 +286,16 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
       }
     }
 
+    // 标题验证
+    if (title.trim() && title.length > 100) {
+      errors.title = t('titleLengthError')
+    }
+
+    // 简介验证
+    if (description.trim() && description.length > 200) {
+      errors.description = t('descriptionLengthError')
+    }
+
     // 自定义路径验证
     if (customPath.trim()) {
       if (!/^[a-zA-Z0-9_-]+$/.test(customPath)) {
@@ -333,6 +350,8 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
         },
         body: JSON.stringify({
           originalUrl: url,
+          title: title.trim() || undefined,
+          description: description.trim() || undefined,
           customPath: customPath || undefined,
           password: password || undefined,
           expiresAt: expiresAt || undefined,
@@ -347,6 +366,8 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
         
         // 重置表单
         setUrl('')
+        setTitle('')
+        setDescription('')
         setCustomPath('')
         setPassword('')
         setExpiresAt('')
@@ -732,7 +753,58 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
           }`}>
             <div className="min-h-0 space-y-4">
               
-              {/* 第一行：自定义地址和访问密码 */}
+              {/* 第一行：标题和简介 */}
+              <div className="grid md:grid-cols-2 gap-4">
+                {/* 自定义标题 */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 ml-1">{t('customTitle')}</label>
+                  <div className={`cute-input-wrapper bg-white dark:bg-slate-800 rounded-lg px-3 py-2 flex items-center gap-2 text-sm ${
+                    formErrors.title ? 'border border-red-300 dark:border-red-400' : ''
+                  }`}>
+                    <input 
+                      type="text" 
+                      placeholder={t('customTitlePlaceholder')}
+                      className="w-full outline-none text-slate-700 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500"
+                      value={title}
+                      onChange={(e) => {
+                        setTitle(e.target.value)
+                        if (formErrors.title) {
+                          setFormErrors(prev => ({ ...prev, title: '' }))
+                        }
+                      }}
+                    />
+                  </div>
+                  {formErrors.title && (
+                    <p className="text-xs text-red-500 mt-1">{formErrors.title}</p>
+                  )}
+                </div>
+
+                {/* 简介描述 */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 ml-1">{t('customDescription')}</label>
+                  <div className={`cute-input-wrapper bg-white dark:bg-slate-800 rounded-lg px-3 py-2 flex items-center gap-2 text-sm ${
+                    formErrors.description ? 'border border-red-300 dark:border-red-400' : ''
+                  }`}>
+                    <input 
+                      type="text" 
+                      placeholder={t('customDescriptionPlaceholder')}
+                      className="w-full outline-none text-slate-700 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500"
+                      value={description}
+                      onChange={(e) => {
+                        setDescription(e.target.value)
+                        if (formErrors.description) {
+                          setFormErrors(prev => ({ ...prev, description: '' }))
+                        }
+                      }}
+                    />
+                  </div>
+                  {formErrors.description && (
+                    <p className="text-xs text-red-500 mt-1">{formErrors.description}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* 第二行：自定义地址和访问密码 */}
               <div className="grid md:grid-cols-2 gap-4">
                 {/* 自定义地址 */}
                 <div>
@@ -1139,7 +1211,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                     {link.shortUrl}
                   </h3>
                   <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-600 hidden md:inline-block">
-                    {formatTimeAgo(new Date(link.createdAt))}
+                    {formatTimeAgo(new Date(link.createdAt), language)}
                   </span>
                   {/* 过期状态标签 */}
                   {isLinkExpired(link) && (
@@ -1149,7 +1221,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                   )}
                   {/* 过期时间显示 */}
                   {link.expiresAt && !isLinkExpired(link) && (() => {
-                    const remaining = formatTimeRemaining(new Date(link.expiresAt))
+                    const remaining = formatTimeRemaining(new Date(link.expiresAt), language)
                     return (
                       <span className="text-xs bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-md border border-orange-200 dark:border-orange-700">
                         {remaining.isImminentExpiry ? t('imminentExpiry') : t('expiresIn', { time: remaining.time })}
@@ -1160,6 +1232,11 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                 <p className="text-sm text-slate-500 dark:text-slate-400 truncate max-w-md mx-auto md:mx-0">
                   {link.title || link.originalUrl}
                 </p>
+                {link.description && (
+                  <p className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-md mx-auto md:mx-0 mt-1">
+                    {link.description}
+                  </p>
+                )}
                 {/* 过期时间详细信息 */}
                 {link.expiresAt && (
                   <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">

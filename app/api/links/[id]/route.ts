@@ -68,6 +68,8 @@ export async function PUT(
     const body = await request.json()
     const { 
       originalUrl, 
+      title,
+      description,
       customPath, 
       password, 
       expiresAt, 
@@ -136,10 +138,14 @@ export async function PUT(
       }
     }
 
-    // 尝试获取页面标题（如果URL发生变化）
-    let title = existingLink.title
-    if (originalUrl !== existingLink.originalUrl) {
-      title = await fetchPageTitle(originalUrl)
+    // 处理标题：优先使用用户提供的标题，如果没有且URL变化了则自动获取
+    let finalTitle = existingLink.title
+    if (title !== undefined) {
+      // 用户明确提供了标题（可能为空字符串）
+      finalTitle = title.trim() || null
+    } else if (originalUrl !== existingLink.originalUrl) {
+      // URL变化了但用户没有提供标题，自动获取
+      finalTitle = await fetchPageTitle(originalUrl)
     }
 
     // 处理密码
@@ -154,7 +160,8 @@ export async function PUT(
       data: {
         ...(customPath && customPath !== existingLink.path && { path: customPath }),
         originalUrl,
-        title,
+        title: finalTitle,
+        description: description !== undefined ? (description.trim() || null) : existingLink.description,
         password: encryptedPassword,
         expiresAt: expiresAt ? new Date(expiresAt) : null,
         requireConfirm,
@@ -168,6 +175,7 @@ export async function PUT(
       shortUrl: generateShortUrl(updatedLink.path, request),
       originalUrl: updatedLink.originalUrl,
       title: updatedLink.title,
+      description: updatedLink.description,
       views: updatedLink.views,
       createdAt: updatedLink.createdAt,
       expiresAt: updatedLink.expiresAt,

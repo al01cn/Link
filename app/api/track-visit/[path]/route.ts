@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { logVisit, logError } from '@/lib/logger'
+import Logger from '@/lib/logger'
 import { useTranslation } from '@/lib/translations'
 
 /**
@@ -56,19 +56,14 @@ export async function POST(
         }
       }),
       // 记录系统日志
-      logVisit(path, shortLink.originalUrl, request, {
-        shortLinkId: shortLink.id,
-        title: shortLink.title,
-        hasPassword: !!shortLink.password,
-        referer
-      })
+      Logger.logVisit(path, shortLink.originalUrl, Logger.extractRequestContext(request))
     ])
 
     return NextResponse.json({ success: true })
 
   } catch (error) {
     console.error(t('trackVisitFailed') + ':', error)
-    await logError(t('trackVisitFailed'), error, request)
+    await Logger.logError(error as Error, Logger.extractRequestContext(request))
     return NextResponse.json({ error: t('apiServerError') }, { status: 500 })
   }
 }

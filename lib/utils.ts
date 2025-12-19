@@ -188,7 +188,7 @@ export async function fetchPageTitle(url: string): Promise<string | null> {
 }
 
 // 格式化时间
-export function formatTimeAgo(date: Date): string {
+export function formatTimeAgo(date: Date, language: 'zh' | 'en' = 'zh'): string {
   const now = new Date()
   const diff = now.getTime() - date.getTime()
   
@@ -196,16 +196,23 @@ export function formatTimeAgo(date: Date): string {
   const hours = Math.floor(diff / (1000 * 60 * 60))
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))
   
-  if (minutes < 1) return '刚刚'
-  if (minutes < 60) return `${minutes}分钟前`
-  if (hours < 24) return `${hours}小时前`
-  if (days < 30) return `${days}天前`
-  
-  return date.toLocaleDateString('zh-CN')
+  if (language === 'zh') {
+    if (minutes < 1) return '刚刚'
+    if (minutes < 60) return `${minutes}分钟前`
+    if (hours < 24) return `${hours}小时前`
+    if (days < 30) return `${days}天前`
+    return date.toLocaleDateString('zh-CN')
+  } else {
+    if (minutes < 1) return 'Just now'
+    if (minutes < 60) return `${minutes} min${minutes > 1 ? 's' : ''} ago`
+    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`
+    if (days < 30) return `${days} day${days > 1 ? 's' : ''} ago`
+    return date.toLocaleDateString('en-US')
+  }
 }
 
 // 格式化剩余时间（用于过期时间显示）
-export function formatTimeRemaining(date: Date): { time: string; isImminentExpiry: boolean; isExpired: boolean } {
+export function formatTimeRemaining(date: Date, language: 'zh' | 'en' = 'zh'): { time: string; isImminentExpiry: boolean; isExpired: boolean } {
   const now = new Date()
   const diff = date.getTime() - now.getTime()
   
@@ -217,11 +224,18 @@ export function formatTimeRemaining(date: Date): { time: string; isImminentExpir
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))
   
   if (minutes < 1) return { time: '', isImminentExpiry: true, isExpired: false } // 即将过期的特殊情况
-  if (minutes < 60) return { time: `${minutes}分钟`, isImminentExpiry: false, isExpired: false }
-  if (hours < 24) return { time: `${hours}小时`, isImminentExpiry: false, isExpired: false }
-  if (days < 30) return { time: `${days}天`, isImminentExpiry: false, isExpired: false }
   
-  return { time: date.toLocaleDateString('zh-CN'), isImminentExpiry: false, isExpired: false }
+  if (language === 'zh') {
+    if (minutes < 60) return { time: `${minutes}分钟`, isImminentExpiry: false, isExpired: false }
+    if (hours < 24) return { time: `${hours}小时`, isImminentExpiry: false, isExpired: false }
+    if (days < 30) return { time: `${days}天`, isImminentExpiry: false, isExpired: false }
+    return { time: date.toLocaleDateString('zh-CN'), isImminentExpiry: false, isExpired: false }
+  } else {
+    if (minutes < 60) return { time: `${minutes} min${minutes > 1 ? 's' : ''}`, isImminentExpiry: false, isExpired: false }
+    if (hours < 24) return { time: `${hours} hour${hours > 1 ? 's' : ''}`, isImminentExpiry: false, isExpired: false }
+    if (days < 30) return { time: `${days} day${days > 1 ? 's' : ''}`, isImminentExpiry: false, isExpired: false }
+    return { time: date.toLocaleDateString('en-US'), isImminentExpiry: false, isExpired: false }
+  }
 }
 
 // 检查域名规则是否匹配

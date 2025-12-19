@@ -5,7 +5,7 @@ import { Icon } from '@iconify/react'
 import { useState } from 'react'
 import AdminDropdown from './AdminDropdown'
 import ApiDocumentation from './ApiDocumentation'
-import LogsView from './LogsView'
+import EnhancedLogsView from './EnhancedLogsView'
 import ThemeToggle from './ThemeToggle'
 import { TranslationKey } from '@/lib/translations'
 
@@ -24,7 +24,7 @@ export default function Navbar({ onViewChange, currentView, lang, toggleLang, t 
   return (
     <>
       <ApiDocumentation isOpen={showApiDocs} onClose={() => setShowApiDocs(false)} />
-      <LogsView isOpen={showLogs} onClose={() => setShowLogs(false)} />
+      <EnhancedLogsView isOpen={showLogs} onClose={() => setShowLogs(false)} />
       <nav className="flex items-center sm:justify-between justify-center px-4 sm:px-6 py-3 sm:py-4 max-w-5xl mx-auto w-full z-10 relative">
         {/* Logo区域 - 只在小屏幕及以上显示 */}
         <div
