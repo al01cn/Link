@@ -77,18 +77,26 @@ bun run build && bun run start
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/al01cn/Link&env=DATABASE_PROVIDER,DATABASE_URL,ENCRYPTION_KEY&envDescription=数据库配置和应用密钥&envLink=https://gh.llkk.cc/https://github.com/al01cn/Link/blob/main/.env.example)
 
-### Netlify 部署
-
-点击下面按钮即可一键部署到 Netlify：
-
-[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/al01cn/Link)
-
 **部署时需要配置的环境变量：**
 - `DATABASE_PROVIDER` - 数据库类型（postgresql 或 mysql）
 - `DATABASE_URL` - 数据库连接字符串
 - `ENCRYPTION_KEY` - 密码加密密钥
 
 > 💡 **提示**：推荐使用 [Supabase](https://supabase.com) 或 [Neon](https://neon.tech) 的免费 PostgreSQL 数据库。系统会根据 `DATABASE_PROVIDER` 自动选择正确的数据库 schema。
+
+## 🚀 一键部署到 Netlify
+
+点击下面按钮即可一键部署，系统会自动提示配置必需的环境变量：
+
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/al01cn/Link)
+
+**部署时需要配置的环境变量：**
+- `DATABASE_PROVIDER` - 数据库类型（postgresql 或 mysql）
+- `DATABASE_URL` - 数据库连接字符串
+- `NEXT_PUBLIC_BASE_URL` - 应用访问地址（可选，为空将自动获取）
+- `ENCRYPTION_KEY` - 密码加密密钥
+
+> 💡 **提示**：Netlify 会根据 `netlify.toml` 配置自动提示需要配置的环境变量。
 
 ## 🚀 部署指南
 
@@ -141,19 +149,6 @@ DATABASE_URL="mysql://username:password@host:3306/database"
 
 > 📖 **详细迁移指南**：查看 [DATABASE_MIGRATION.md](./DATABASE_MIGRATION.md) 获取完整的数据库迁移步骤和常见问题解决方案。
 
-## 🚀 一键部署到 Netlify
-
-点击下面按钮即可一键部署，系统会自动提示配置必需的环境变量：
-
-[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/al01cn/Link)
-
-**部署时需要配置的环境变量：**
-- `DATABASE_PROVIDER` - 数据库类型（postgresql 或 mysql）
-- `DATABASE_URL` - 数据库连接字符串
-- `NEXT_PUBLIC_BASE_URL` - 应用访问地址
-- `ENCRYPTION_KEY` - 密码加密密钥
-
-> 💡 **提示**：Netlify 会根据 `netlify.toml` 配置自动提示需要配置的环境变量。
 
 ### Docker 部署
 
@@ -250,5 +245,18 @@ TURNSTILE_SECRET_KEY="your-secret-key"
 **灵狼Link** - 让长链接变短，让分享更简单 ✨
 
 [🐛 问题反馈](https://github.com/al01cn/Link/issues) • [💬 功能讨论](https://github.com/al01cn/Link/discussions) • [📖 API文档](./API.md) • [🌍 English](./README_EN.md)
+
+</div>
+
+---
+
+<div align="center">
+
+### 📦 赞助
+
+[灵狼AL01](https://www.al01.cn/#energy)
+
+
+**感谢支持** - 你的支持是我开发和维护灵狼Link的动力！
 
 </div>
