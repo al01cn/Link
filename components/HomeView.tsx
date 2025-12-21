@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Link2, ArrowRight, Settings, ChevronDown, Lock, Shield, Zap, Eye, Copy, Trash2, X, Search, Filter, Calendar, SortAsc, SortDesc, MousePointer, ExternalLink, Edit, Check } from 'lucide-react'
+import { Link2, ArrowRight, Settings, ChevronDown, Lock, Shield, Zap, Eye, Copy, Trash2, X, Search, Filter, Calendar, SortAsc, SortDesc, MousePointer, ExternalLink, Edit, Check, Square, CheckSquare, Clock } from 'lucide-react'
 import { formatTimeAgo, formatTimeRemaining, truncateDomain, truncateUrl } from '@/lib/utils'
 import { useHostname } from '@/lib/useHostname'
 import { TranslationKey } from '@/lib/translations'
@@ -41,6 +41,11 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
   const [copySuccess, setCopySuccess] = useState<string | null>(null)
   const [isClient, setIsClient] = useState(false)
   
+  // 批量操作状态
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showBatchActions, setShowBatchActions] = useState(false)
+  const [isBatchMode, setIsBatchMode] = useState(false)
+  
   // 获取当前主机名（客户端专用）
   const hostname = useHostname()
   
@@ -76,6 +81,14 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
   
   // 主题状态
   const [isDarkMode, setIsDarkMode] = useState(false)
+  
+  // 批量设置弹窗状态
+  const [showBatchSettingsModal, setShowBatchSettingsModal] = useState(false)
+  const [batchExpiresAt, setBatchExpiresAt] = useState('')
+  const [batchPassword, setBatchPassword] = useState('')
+  const [batchRequireConfirm, setBatchRequireConfirm] = useState<boolean | null>(null)
+  const [batchEnableIntermediate, setBatchEnableIntermediate] = useState<boolean | null>(null)
+  const batchSettingsDialogRef = useRef<HTMLDialogElement>(null)
   
   // 检查管理员登录状态
   useEffect(() => {
@@ -340,6 +353,13 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
         return
       }
 
+      // 将本地时间转换为 UTC ISO 字符串
+      let expiresAtISO: string | undefined = undefined
+      if (expiresAt) {
+        const localDate = new Date(expiresAt)
+        expiresAtISO = localDate.toISOString()
+      }
+
       const response = await fetch('/api/links', {
         method: 'POST',
         headers: {
@@ -352,7 +372,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
           description: description.trim() || undefined,
           customPath: customPath || undefined,
           password: password || undefined,
-          expiresAt: expiresAt || undefined,
+          expiresAt: expiresAtISO,
           requireConfirm,
           enableIntermediate
         })
@@ -683,6 +703,211 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
     setFilterType('all')
     setSortBy('newest')
   }
+  
+  // 批量选择功能
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredAndSortedLinks.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filteredAndSortedLinks.map(link => link.id)))
+    }
+  }
+  
+  const toggleSelect = (id: string) => {
+    const newSelectedIds = new Set(selectedIds)
+    if (newSelectedIds.has(id)) {
+      newSelectedIds.delete(id)
+    } else {
+      newSelectedIds.add(id)
+    }
+    setSelectedIds(newSelectedIds)
+  }
+  
+  const toggleBatchMode = () => {
+    setIsBatchMode(!isBatchMode)
+    if (isBatchMode) {
+      setSelectedIds(new Set())
+    }
+  }
+  
+  // 批量删除
+  const handleBatchDelete = async () => {
+    if (selectedIds.size === 0) return
+    
+    const confirmed = await confirmDialog.confirm({
+      type: 'danger',
+      title: t('confirmBatchDelete'),
+      message: t('confirmBatchDeleteMessage', { count: selectedIds.size }),
+      confirmText: t('delete'),
+      cancelText: t('cancel')
+    })
+    
+    if (!confirmed) return
+    
+    try {
+      const token = typeof window !== 'undefined' ? sessionStorage.getItem('adminToken') : null
+      if (!token) {
+        notificationDialog.notify({
+          type: 'error',
+          message: '未找到管理员权限，请重新登录'
+        })
+        return
+      }
+      
+      // 并发删除所有选中的链接
+      const deletePromises = Array.from(selectedIds).map(id => 
+        fetch(`/api/links/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+      )
+      
+      const results = await Promise.all(deletePromises)
+      const successCount = results.filter(r => r.ok).length
+      
+      if (successCount > 0) {
+        // 更新列表
+        setLinks(links.filter(link => !selectedIds.has(link.id)))
+        setSelectedIds(new Set())
+        notificationDialog.notify({
+          type: 'success',
+          message: t('batchDeleteSuccess', { count: successCount })
+        })
+      }
+      
+      if (successCount < selectedIds.size) {
+        notificationDialog.notify({
+          type: 'warning',
+          message: t('batchDeletePartialFail', { success: successCount, total: selectedIds.size })
+        })
+      }
+    } catch (error) {
+      console.error('批量删除失败:', error)
+      notificationDialog.notify({
+        type: 'error',
+        message: t('batchDeleteFailed')
+      })
+    }
+  }
+  
+  // 显示批量设置弹窗
+  const showBatchSettings = () => {
+    if (selectedIds.size === 0) return
+    setBatchExpiresAt('')
+    setBatchPassword('')
+    setBatchRequireConfirm(null)
+    setBatchEnableIntermediate(null)
+    setShowBatchSettingsModal(true)
+  }
+  
+  // 批量设置弹窗效果
+  useEffect(() => {
+    const initBatchSettingsDialog = async () => {
+      const dialog = batchSettingsDialogRef.current
+      if (showBatchSettingsModal && dialog) {
+        if (!dialog.showModal) {
+          const dialogPolyfill = await import('dialog-polyfill')
+          dialogPolyfill.default.registerDialog(dialog)
+        }
+        dialog.showModal()
+        const isDark = document.documentElement.classList.contains('dark')
+        if (isDark) {
+          dialog.classList.add('dark')
+        } else {
+          dialog.classList.remove('dark')
+        }
+      } else if (!showBatchSettingsModal && dialog && dialog.open) {
+        dialog.close()
+      }
+    }
+    initBatchSettingsDialog()
+  }, [showBatchSettingsModal])
+  
+  // 提交批量设置
+  const handleBatchSettings = async () => {
+    if (selectedIds.size === 0) return
+    
+    try {
+      const token = typeof window !== 'undefined' ? sessionStorage.getItem('adminToken') : null
+      if (!token) {
+        notificationDialog.notify({
+          type: 'error',
+          message: '未找到管理员权限，请重新登录'
+        })
+        return
+      }
+      
+      // 构建更新数据
+      const updateData: any = {}
+      
+      if (batchExpiresAt) {
+        const localDate = new Date(batchExpiresAt)
+        updateData.expiresAt = localDate.toISOString()
+      }
+      
+      if (batchPassword !== '') {
+        updateData.password = batchPassword || undefined
+      }
+      
+      if (batchRequireConfirm !== null) {
+        updateData.requireConfirm = batchRequireConfirm
+      }
+      
+      if (batchEnableIntermediate !== null) {
+        updateData.enableIntermediate = batchEnableIntermediate
+      }
+      
+      // 检查是否有任何设置
+      if (Object.keys(updateData).length === 0) {
+        notificationDialog.notify({
+          type: 'warning',
+          message: t('noSettingsChanged')
+        })
+        return
+      }
+      
+      // 并发更新所有选中的链接
+      const updatePromises = Array.from(selectedIds).map(id => 
+        fetch(`/api/links/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(updateData)
+        })
+      )
+      
+      const results = await Promise.all(updatePromises)
+      const successCount = results.filter(r => r.ok).length
+      
+      if (successCount > 0) {
+        // 重新加载链接列表
+        await fetchLinks()
+        setSelectedIds(new Set())
+        setShowBatchSettingsModal(false)
+        notificationDialog.notify({
+          type: 'success',
+          message: t('batchSettingsSuccess', { count: successCount })
+        })
+      }
+      
+      if (successCount < selectedIds.size) {
+        notificationDialog.notify({
+          type: 'warning',
+          message: t('batchSettingsPartialFail', { success: successCount, total: selectedIds.size })
+        })
+      }
+    } catch (error) {
+      console.error('批量设置失败:', error)
+      notificationDialog.notify({
+        type: 'error',
+        message: t('batchSettingsFailed')
+      })
+    }
+  }
 
   return (
     <div className="max-w-3xl mx-auto w-full px-4 pb-20">
@@ -967,7 +1192,7 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
       {/* 搜索和筛选区域 */}
       {links.length > 0 && (
         <div className={`cute-card p-4 mb-6 ${isClient ? 'animate__animated animate__fadeInUp' : ''}`}>
-          {/* 搜索框 */}
+          {/* 搜索框和批量操作按钮 */}
           <div className="flex flex-col md:flex-row gap-3 mb-4">
             <div className="cute-input-wrapper flex-1 bg-slate-50 dark:bg-slate-800 rounded-lg px-4 py-3 flex items-center gap-3">
               <Search className="text-slate-400 dark:text-slate-500" size={18} />
@@ -988,6 +1213,19 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
               )}
             </div>
             
+            {/* 批量操作按钮 */}
+            <button 
+              onClick={toggleBatchMode}
+              className={`px-4 py-3 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                isBatchMode
+                  ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700' 
+                  : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+              }`}
+            >
+              {isBatchMode ? <CheckSquare size={18} /> : <Square size={18} />}
+              {isBatchMode ? t('exitBatchMode') : t('batchMode')}
+            </button>
+            
             {/* 筛选按钮 */}
             <button 
               onClick={() => setShowFilters(!showFilters)}
@@ -1004,6 +1242,34 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
               )}
             </button>
           </div>
+          
+          {/* 批量操作工具栏 */}
+          {isBatchMode && selectedIds.size > 0 && (
+            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckSquare size={18} className="text-blue-600 dark:text-blue-400" />
+                <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                  {t('selectedCount', { count: selectedIds.size })}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={showBatchSettings}
+                  className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+                >
+                  <Settings size={14} />
+                  {t('batchSettings')}
+                </button>
+                <button
+                  onClick={handleBatchDelete}
+                  className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+                >
+                  <Trash2 size={14} />
+                  {t('batchDelete')}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* 筛选选项面板 */}
           <div className={`grid gap-4 overflow-hidden transition-all duration-300 ease-out ${
@@ -1174,6 +1440,19 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
               })`}
             </div>
           )}
+          
+          {/* 批量模式下的全选/反选按钮 */}
+          {isBatchMode && filteredAndSortedLinks.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+              <button
+                onClick={toggleSelectAll}
+                className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium flex items-center gap-1"
+              >
+                {selectedIds.size === filteredAndSortedLinks.length ? <CheckSquare size={14} /> : <Square size={14} />}
+                {selectedIds.size === filteredAndSortedLinks.length ? t('deselectAll') : t('selectAll')}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -1187,6 +1466,22 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
           >
             {/* 短链信息行 */}
             <div className="p-4 flex flex-col md:flex-row items-center gap-4">
+              {/* 批量选择复选框 */}
+              {isBatchMode && (
+                <div className="flex-shrink-0">
+                  <button
+                    onClick={() => toggleSelect(link.id)}
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                      selectedIds.has(link.id)
+                        ? 'bg-blue-500 text-white hover:bg-blue-600'
+                        : 'bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600'
+                    }`}
+                  >
+                    {selectedIds.has(link.id) ? <CheckSquare size={18} /> : <Square size={18} />}
+                  </button>
+                </div>
+              )}
+              
               {/* 图标 */}
               <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-700 flex items-center justify-center flex-shrink-0 text-slate-400 dark:text-slate-500">
                 {link.hasPassword ? (
@@ -1501,6 +1796,199 @@ export default function HomeView({ onSimulateVisit, t }: HomeViewProps) {
                 }`}
               >
                 {t('close')}
+              </button>
+            </div>
+          </div>
+        </dialog>
+      )}
+      
+      {/* 批量设置弹窗 */}
+      {showBatchSettingsModal && (
+        <dialog 
+          ref={batchSettingsDialogRef}
+          className="backdrop:bg-black/50 bg-transparent p-4 rounded-2xl"
+          onClick={(e) => e.target === batchSettingsDialogRef.current && setShowBatchSettingsModal(false)}
+        >
+          <div className={`rounded-2xl shadow-2xl max-w-lg w-full p-6 animate__animated animate__fadeIn animate__faster ${isDarkMode ? 'bg-slate-800 text-slate-200' : 'bg-white text-gray-900'}`}>
+            {/* 弹窗标题 */}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-lg font-bold flex items-center gap-2 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                <Settings size={20} className="text-blue-500" />
+                {t('batchSettings')}
+              </h3>
+              <button 
+                onClick={() => setShowBatchSettingsModal(false)}
+                className={`p-1 rounded-lg transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-slate-500 hover:text-slate-300' : 'hover:bg-slate-100 text-slate-400 hover:text-slate-600'}`}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* 说明文字 */}
+            <p className={`text-sm mb-4 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              {t('batchSettingsDescription', { count: selectedIds.size })}
+            </p>
+
+            {/* 设置选项 */}
+            <div className="space-y-4 mb-6">
+              {/* 过期时间 */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                  <div className="flex items-center gap-2">
+                    <Clock size={16} />
+                    {t('setExpirationTime')}
+                  </div>
+                </label>
+                <input 
+                  type="datetime-local" 
+                  value={batchExpiresAt}
+                  onChange={(e) => setBatchExpiresAt(e.target.value)}
+                  className={`w-full px-4 py-2 rounded-lg border ${isDarkMode ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-800'} focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none`}
+                />
+                <p className={`text-xs mt-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                  {t('leaveEmptyToSkip')}
+                </p>
+              </div>
+
+              {/* 访问密码 */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                  <div className="flex items-center gap-2">
+                    <Lock size={16} />
+                    {t('password')}
+                  </div>
+                </label>
+                <input 
+                  type="text" 
+                  value={batchPassword}
+                  onChange={(e) => setBatchPassword(e.target.value)}
+                  placeholder={t('batchPasswordPlaceholder')}
+                  className={`w-full px-4 py-2 rounded-lg border ${isDarkMode ? 'bg-slate-700 border-slate-600 text-slate-200 placeholder-slate-500' : 'bg-white border-slate-300 text-slate-800 placeholder-slate-400'} focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none`}
+                />
+                <p className={`text-xs mt-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                  {t('leaveEmptyToSkip')}
+                </p>
+              </div>
+
+              {/* 中间页设置 */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                  <div className="flex items-center gap-2">
+                    <Zap size={16} />
+                    {t('enableIntermediate')}
+                  </div>
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setBatchEnableIntermediate(true)}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      batchEnableIntermediate === true
+                        ? 'bg-blue-500 text-white'
+                        : isDarkMode
+                          ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {t('enable')}
+                  </button>
+                  <button
+                    onClick={() => setBatchEnableIntermediate(false)}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      batchEnableIntermediate === false
+                        ? 'bg-blue-500 text-white'
+                        : isDarkMode
+                          ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {t('disable')}
+                  </button>
+                  <button
+                    onClick={() => setBatchEnableIntermediate(null)}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      batchEnableIntermediate === null
+                        ? isDarkMode
+                          ? 'bg-slate-600 text-slate-200'
+                          : 'bg-slate-200 text-slate-700'
+                        : isDarkMode
+                          ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {t('noChange')}
+                  </button>
+                </div>
+              </div>
+
+              {/* 二次确认设置 */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                  <div className="flex items-center gap-2">
+                    <Shield size={16} />
+                    {t('enableConfirm')}
+                  </div>
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setBatchRequireConfirm(true)}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      batchRequireConfirm === true
+                        ? 'bg-blue-500 text-white'
+                        : isDarkMode
+                          ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {t('enable')}
+                  </button>
+                  <button
+                    onClick={() => setBatchRequireConfirm(false)}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      batchRequireConfirm === false
+                        ? 'bg-blue-500 text-white'
+                        : isDarkMode
+                          ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {t('disable')}
+                  </button>
+                  <button
+                    onClick={() => setBatchRequireConfirm(null)}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      batchRequireConfirm === null
+                        ? isDarkMode
+                          ? 'bg-slate-600 text-slate-200'
+                          : 'bg-slate-200 text-slate-700'
+                        : isDarkMode
+                          ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {t('noChange')}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 操作按钮 */}
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setShowBatchSettingsModal(false)}
+                className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                  isDarkMode 
+                    ? 'bg-slate-700 hover:bg-slate-600 text-slate-200' 
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
+              >
+                {t('cancel')}
+              </button>
+              <button 
+                onClick={handleBatchSettings}
+                className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                <Check size={16} />
+                {t('apply')}
               </button>
             </div>
           </div>

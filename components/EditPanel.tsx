@@ -162,13 +162,20 @@ export default function EditPanel({ link, isExpanded, onSave, onCancel }: EditPa
     setIsLoading(true)
     
     try {
+      // 将本地时间转换为 UTC ISO 字符串
+      let expiresAtISO: string | undefined = undefined
+      if (expiresAt) {
+        const localDate = new Date(expiresAt)
+        expiresAtISO = localDate.toISOString()
+      }
+      
       await onSave(link.id, {
         originalUrl,
         title: title.trim() || undefined,
         description: description.trim() || undefined,
         customPath: customPath || undefined,
         password: password || undefined,
-        expiresAt: expiresAt || undefined,
+        expiresAt: expiresAtISO,
         requireConfirm,
         enableIntermediate
       })

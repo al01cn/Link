@@ -55,9 +55,11 @@ export default function SafeRedirectClient({
   const { t, language, setLanguage } = useLanguage()
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const [countdown, setCountdown] = useState(5) // 默认5秒倒计时
+  const [waitTime, setWaitTime] = useState(5) // 保存设置中的等待时间
+  const [countdown, setCountdown] = useState(5) // 当前倒计时
   const [isProcessing, setIsProcessing] = useState(false)
   const [isClient, setIsClient] = useState(false)
+  const [isDataLoaded, setIsDataLoaded] = useState(false) // 数据是否加载完成
   const [domainBlocked, setDomainBlocked] = useState(false)
   const [blockReason, setBlockReason] = useState('')
   const [blockCountdown, setBlockCountdown] = useState(5)
@@ -269,9 +271,29 @@ export default function SafeRedirectClient({
     
     setIsClient(true)
     
-    // 如果过期，不执行后续逻辑
+    // 如果过期，直接标记数据加载完成，不执行后续逻辑
     if (isExpired) {
+      setIsDataLoaded(true)
       return
+    }
+    
+    // 并发加载所有必要数据
+    const loadAllData = async () => {
+      try {
+        await Promise.all([
+          checkDomain(),
+          loadSettings()
+        ])
+        
+        if (isMounted) {
+          setIsDataLoaded(true) // 所有数据加载完成
+        }
+      } catch (error) {
+        console.error('加载数据失败:', error)
+        if (isMounted) {
+          setIsDataLoaded(true) // 即使失败也继续显示，避免一直加载
+        }
+      }
     }
     
     // 检查域名访问权限
@@ -309,22 +331,23 @@ export default function SafeRedirectClient({
         })
         
         if (isMounted) {
+          const newWaitTime = data.waitTime || 5
           setCaptchaEnabled(data.captchaEnabled || false)
           setPreloadEnabled(data.preloadEnabled !== false) // 默认启用
           setAutoFillPasswordEnabled(data.autoFillPasswordEnabled !== false) // 默认启用
           if (data.captchaEnabled) {
             setShowCaptcha(true)
           }
-          // 更新倒计时时间
-          setCountdown(data.waitTime || 5)
+          // 更新等待时间和倒计时时间
+          setWaitTime(newWaitTime)
+          setCountdown(newWaitTime)
         }
       } catch (error) {
         console.error(t('loadingSettings') + ':', error)
       }
     }
 
-    checkDomain()
-    loadSettings()
+    loadAllData()
 
     return () => {
       isMounted = false
@@ -361,29 +384,32 @@ export default function SafeRedirectClient({
 
 
   useEffect(() => {
-    if (!enableCountdown || domainBlocked) return
+    if (!enableCountdown || domainBlocked || isExpired) return
 
     if (countdown > 0) {
       const timer = setInterval(() => {
         setCountdown(prev => {
           if (prev <= 1) {
             // 倒计时结束，触发跳转
-            setTimeout(() => handleProceed(), 0) // 使用 setTimeout 确保状态更新完成
+            setTimeout(() => handleProceed(), 0)
             return 0
           }
           return prev - 1
         })
       }, 1000)
       return () => clearInterval(timer)
+    } else if (countdown === 0 && !hasJumped) {
+      // 确保倒计时为0时触发跳转
+      handleProceed()
     }
-  }, [enableCountdown, domainBlocked]) // 移除 countdown 和 handleProceed 依赖，避免循环
+  }, [enableCountdown, domainBlocked, isExpired, countdown, hasJumped, handleProceed])
 
   // 预加载逻辑
   useEffect(() => {
     if (!preloadEnabled || domainBlocked) return
     
     // 自动跳转模式：在倒计时开始时进行预加载（人机验证通过后）
-    if (!showButtons && enableCountdown && countdown === 5) { // 使用默认倒计时时间
+    if (!showButtons && enableCountdown && countdown === waitTime) { // 使用动态的 waitTime
       preloadTargetUrl(targetUrl)
       return
     }
@@ -398,7 +424,7 @@ export default function SafeRedirectClient({
     if (showButtons && captchaEnabled && captchaVerified) {
       preloadTargetUrl(targetUrl)
     }
-  }, [preloadEnabled, domainBlocked, showButtons, enableCountdown, countdown, targetUrl, captchaEnabled, captchaVerified])
+  }, [preloadEnabled, domainBlocked, showButtons, enableCountdown, countdown, waitTime, targetUrl, captchaEnabled, captchaVerified])
 
   // 域名被拦截时的倒计时
   useEffect(() => {
@@ -473,11 +499,20 @@ export default function SafeRedirectClient({
         {!isClient ? (
           // 服务端渲染时显示加载状态，避免水合不匹配
           <div className="cute-card max-w-md w-full p-6 sm:p-8 text-center">
-            <div className="w-16 h-16 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 rounded-full flex items-center justify-center mx-auto mb-6">
               <Zap size={32} />
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-800 mb-2 wrap-break-word">加载中...</h2>
-            <p className="text-slate-500 mb-6 text-sm leading-relaxed">正在准备跳转</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-200 mb-2 wrap-break-word">{t('loading')}</h2>
+            <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm leading-relaxed">{t('loadingData')}</p>
+          </div>
+        ) : !isDataLoaded ? (
+          // 客户端数据加载中
+          <div className="cute-card max-w-md w-full p-6 sm:p-8 text-center">
+            <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Zap size={32} />
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-200 mb-2 wrap-break-word">{t('loading')}</h2>
+            <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm leading-relaxed">{t('loadingData')}</p>
           </div>
         ) : (
           <div className="cute-card max-w-md w-full p-6 sm:p-8 text-center animate-fade-in">

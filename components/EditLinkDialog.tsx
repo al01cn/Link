@@ -164,6 +164,13 @@ export default function EditLinkDialog({
     setIsLoading(true)
     
     try {
+      // 将本地时间转换为 UTC ISO 字符串
+      let expiresAtISO: string | undefined = undefined
+      if (expiresAt) {
+        const localDate = new Date(expiresAt)
+        expiresAtISO = localDate.toISOString()
+      }
+      
       const response = await fetch(`/api/links/${link.id}`, {
         method: 'PUT',
         headers: {
@@ -173,7 +180,7 @@ export default function EditLinkDialog({
           originalUrl,
           customPath: customPath || undefined,
           password: password || undefined,
-          expiresAt: expiresAt || undefined,
+          expiresAt: expiresAtISO,
           requireConfirm,
           enableIntermediate
         })

@@ -44,6 +44,31 @@ export const translations = {
     noLinks: '还没有创建任何短链',
     noLinksDesc: '在上方输入长链接开始使用吧',
     
+    // 批量操作
+    batchMode: '批量模式',
+    exitBatchMode: '退出批量',
+    selectedCount: '已选择 {count} 项',
+    selectAll: '全选当页',
+    deselectAll: '取消全选',
+    batchDelete: '批量删除',
+    batchSettings: '批量设置',
+    confirmBatchDelete: '确认批量删除',
+    confirmBatchDeleteMessage: '你将删除 {count} 个短链，此操作不可恢复！',
+    batchDeleteSuccess: '成功删除 {count} 个短链',
+    batchDeleteFailed: '批量删除失败',
+    batchDeletePartialFail: '删除了 {success}/{total} 个短链，部分操作失败',
+    batchSettingsDescription: '为 {count} 个选中的短链批量修改设置，留空则不修改该项',
+    batchSettingsSuccess: '成功更新 {count} 个短链',
+    batchSettingsFailed: '批量设置失败',
+    batchSettingsPartialFail: '更新了 {success}/{total} 个短链，部分操作失败',
+    leaveEmptyToSkip: '留空则不修改此项',
+    batchPasswordPlaceholder: '输入新密码或留空不修改',
+    noSettingsChanged: '请至少选择一项设置',
+    enable: '启用',
+    disable: '禁用',
+    noChange: '不改变',
+    apply: '应用',
+    
     // 安全跳转页面
     leaving: '即将离开 灵狼Link',
     leavingDesc: '正在前往外部链接，请确认链接安全性。',
@@ -178,6 +203,7 @@ export const translations = {
     blacklistEmpty: '黑名单为空，允许所有域名',
     addDomainRules: '在上方添加域名规则',
     loading: '加载中...',
+    loadingData: '正在加载必要数据...',
     
     // 域名填写规范
     domainInputRules: '域名填写规范',
@@ -964,6 +990,31 @@ export const translations = {
     noLinks: 'No links created yet',
     noLinksDesc: 'Enter a long URL above to get started',
     
+    // 批量操作
+    batchMode: 'Batch Mode',
+    exitBatchMode: 'Exit Batch',
+    selectedCount: '{count} selected',
+    selectAll: 'Select All',
+    deselectAll: 'Deselect All',
+    batchDelete: 'Batch Delete',
+    batchSettings: 'Batch Settings',
+    confirmBatchDelete: 'Confirm Batch Delete',
+    confirmBatchDeleteMessage: 'You will delete {count} links. This action cannot be undone!',
+    batchDeleteSuccess: 'Successfully deleted {count} links',
+    batchDeleteFailed: 'Batch delete failed',
+    batchDeletePartialFail: 'Deleted {success}/{total} links, some operations failed',
+    batchSettingsDescription: 'Batch modify settings for {count} selected links. Leave empty to skip.',
+    batchSettingsSuccess: 'Successfully updated {count} links',
+    batchSettingsFailed: 'Batch settings failed',
+    batchSettingsPartialFail: 'Updated {success}/{total} links, some operations failed',
+    leaveEmptyToSkip: 'Leave empty to skip this field',
+    batchPasswordPlaceholder: 'Enter new password or leave empty',
+    noSettingsChanged: 'Please select at least one setting',
+    enable: 'Enable',
+    disable: 'Disable',
+    noChange: 'No Change',
+    apply: 'Apply',
+    
     // 安全跳转页面
     leaving: 'Leaving AL01 Link',
     leavingDesc: 'Heading to an external link. Please verify the link safety.',
@@ -1098,6 +1149,7 @@ export const translations = {
     blacklistEmpty: 'Blacklist is empty, all domains are allowed',
     addDomainRules: 'Add domain rules above',
     loading: 'Loading...',
+    loadingData: 'Loading necessary data...',
     
     // 域名填写规范
     domainInputRules: 'Domain Input Rules',

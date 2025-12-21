@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { AlertTriangle, ExternalLink, Lock, Clock, AlertCircle, ArrowRight, Shield, Zap } from 'lucide-react'
 import { TranslationKey } from '@/lib/translations'
 import { preloadTargetUrl } from '@/lib/utils'
@@ -263,48 +263,8 @@ export default function SafeRedirectView({
     }
   }
 
-  useEffect(() => {
-    if (!enableCountdown || domainBlocked) return
-
-    if (countdown > 0) {
-      const timer = setInterval(() => {
-        setCountdown(prev => {
-          if (prev <= 1) {
-            // 倒计时结束，触发跳转
-            setTimeout(() => handleAutoRedirect(), 0) // 使用 setTimeout 确保状态更新完成
-            return 0
-          }
-          return prev - 1
-        })
-      }, 1000)
-      return () => clearInterval(timer)
-    }
-  }, [enableCountdown, domainBlocked]) // 移除 countdown 和 onProceed 依赖，避免循环
-
-  // 预加载逻辑
-  useEffect(() => {
-    if (!preloadEnabled || domainBlocked) return
-    
-    // 自动跳转模式：在倒计时开始时进行预加载（人机验证通过后）
-    if (!showButtons && enableCountdown && countdown === waitTime) {
-      preloadTargetUrl(targetUrl)
-      return
-    }
-    
-    // 手动确认模式：如果没有启用人机验证，立即预加载
-    if (showButtons && !captchaEnabled) {
-      preloadTargetUrl(targetUrl)
-      return
-    }
-    
-    // 手动确认模式：如果启用了人机验证，在验证通过后预加载
-    if (showButtons && captchaEnabled && captchaVerified) {
-      preloadTargetUrl(targetUrl)
-    }
-  }, [preloadEnabled, domainBlocked, showButtons, enableCountdown, countdown, waitTime, targetUrl, captchaEnabled, captchaVerified])
-
   // 处理自动跳转
-  const handleAutoRedirect = async () => {
+  const handleAutoRedirect = useCallback(async () => {
     if (hasJumped) return // 防止重复跳转
     setHasJumped(true) // 标记已经开始跳转
     
@@ -333,7 +293,50 @@ export default function SafeRedirectView({
       // 普通模式：调用原有的跳转逻辑
       onProceed()
     }
-  }
+  }, [hasJumped, isToMode, targetUrl, title, redirectType, source, t, onProceed])
+
+  useEffect(() => {
+    if (!enableCountdown || domainBlocked || isExpired) return
+
+    if (countdown > 0) {
+      const timer = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            // 倒计时结束，触发跳转
+            setTimeout(() => handleAutoRedirect(), 0)
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+      return () => clearInterval(timer)
+    } else if (countdown === 0 && !hasJumped) {
+      // 确保倒计时为0时触发跳转
+      handleAutoRedirect()
+    }
+  }, [enableCountdown, domainBlocked, isExpired, countdown, hasJumped, handleAutoRedirect])
+
+  // 预加载逻辑
+  useEffect(() => {
+    if (!preloadEnabled || domainBlocked) return
+    
+    // 自动跳转模式：在倒计时开始时进行预加载（人机验证通过后）
+    if (!showButtons && enableCountdown && countdown === waitTime) {
+      preloadTargetUrl(targetUrl)
+      return
+    }
+    
+    // 手动确认模式：如果没有启用人机验证，立即预加载
+    if (showButtons && !captchaEnabled) {
+      preloadTargetUrl(targetUrl)
+      return
+    }
+    
+    // 手动确认模式：如果启用了人机验证，在验证通过后预加载
+    if (showButtons && captchaEnabled && captchaVerified) {
+      preloadTargetUrl(targetUrl)
+    }
+  }, [preloadEnabled, domainBlocked, showButtons, enableCountdown, countdown, waitTime, targetUrl, captchaEnabled, captchaVerified])
 
   // 域名被拦截时的倒计时
   useEffect(() => {
